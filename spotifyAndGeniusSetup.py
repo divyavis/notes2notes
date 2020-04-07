@@ -10,8 +10,8 @@ class MusicSetup(object):
 
     #modified from https://spotipy.readthedocs.io/en/2.9.0/#module-spotipy.client
     def getSpotifyAuth(self):
-        #if os.path.exists(f".cache-{self.spotifyUsername}"):
-            #os.remove(f".cache-{self.spotifyUsername}")
+        if os.path.exists(f".cache-{self.spotifyUsername}"):
+            os.remove(f".cache-{self.spotifyUsername}")
         scope = "user-library-read" #read access to user's "Your Music" library
         clientId = "7b770ecc73434facafdfe5dccace0566"
         clientSecret = "347dff87da6c45ca95cdc71f6c935ceb"

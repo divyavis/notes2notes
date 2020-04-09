@@ -16,8 +16,8 @@ class MusicSetup(object):
 
     #modified from https://spotipy.readthedocs.io/en/2.9.0/#module-spotipy.client
     def getSpotifyAuth(self):
-        if os.path.exists(f".cache-{self.spotifyUsername}"):
-            os.remove(f".cache-{self.spotifyUsername}")
+        #if os.path.exists(f".cache-{self.spotifyUsername}"):
+            #os.remove(f".cache-{self.spotifyUsername}")
         scope = "user-library-read, playlist-modify-public, playlist-modify-private, user-read-playback-state, streaming"
         clientId = "7b770ecc73434facafdfe5dccace0566"
         clientSecret = "347dff87da6c45ca95cdc71f6c935ceb"
@@ -100,6 +100,8 @@ class MusicSetup(object):
         return False
     
     def createPlaylist(self, trackIDs, descrip=None):
+        if descrip != None:
+            playlistDescrip = f"keywords: {descrip}"
         playlistDescrip = descrip
         self.sp.user_playlist_create(self.spotifyUsername, name="month day playlist", public=self.publicPlaylist, description=playlistDescrip)
         for item in self.sp.user_playlists(self.spotifyUsername)['items']:
@@ -181,6 +183,15 @@ def countWordOccurrencesInSong(lyricsDict, relevantWords):
         wordOccurrences[song] = wordCounts
     return wordOccurrences
 
+def getKeywordsUsed(wordCountsDict):
+    keywords = []
+    for song in wordCountsDict:
+        wordCounts = wordCountsDict[song]
+        for word in wordCounts:
+            if word not in keywords:
+                keywords.append(word)
+    return keywords
+
 def scoreSongs(wordCountsDict):
     songScores = []
     for song in wordCountsDict:
@@ -227,15 +238,16 @@ def runSpotify():
     divMusic = MusicSetup("divviswa")
     divMusic.getSpotifyAuth()
     relevantWords = getRelevantWords(journal, nonWords)
-    relevantWordString = ", ".join(relevantWords)
     divMusic.makeSongSet()
     songList = divMusic.getTitleMatchedSongs(relevantWords)
     lyricsDict = divMusic.getSongLyrics(songList)
     wordCounts = countWordOccurrencesInSong(lyricsDict, relevantWords)
+    keywords = getKeywordsUsed(wordCounts)
+    keywordString = ", ".join(keywords)
     songScores = scoreSongs(wordCounts)
     rankedSongs = rankSongs(songScores)
     rankedSongs = eliminateNonMatches(rankedSongs)
     trackIDs = divMusic.getPlaylistTrackIDs(rankedSongs)
-    divMusic.createPlaylist(trackIDs, descrip=relevantWordString)
+    divMusic.createPlaylist(trackIDs, descrip=keywordString)
 
 runSpotify()

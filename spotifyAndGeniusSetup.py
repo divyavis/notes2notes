@@ -151,7 +151,11 @@ class MusicSetup(object):
             trackIDs.append(url)
         return trackIDs
 
+journal = "Today, I had a good day. I hung out with my friends, and we ate dinner together."
+nonWords = ["for", "and", "nor", "but", "or", "yet", "so"]
+
 def getRelevantWords(journal, nonWords):
+    journal = journal.lower()
     relevantWords = []
     for word in journal.split(" "):
         cleanWord = ""
@@ -222,7 +226,7 @@ def eliminateNonMatches(rankedSongs):
 def runSpotify():
     divMusic = MusicSetup("divviswa")
     divMusic.getSpotifyAuth()
-    relevantWords = ["today", "good", "day", "hung", "out", "friends", "ate", "dinner", "together"]
+    relevantWords = getRelevantWords(journal, nonWords)
     relevantWordString = ", ".join(relevantWords)
     divMusic.makeSongSet()
     songList = divMusic.getTitleMatchedSongs(relevantWords)

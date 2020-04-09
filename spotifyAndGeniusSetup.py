@@ -15,8 +15,8 @@ class MusicSetup(object):
 
     #modified from https://spotipy.readthedocs.io/en/2.9.0/#module-spotipy.client
     def getSpotifyAuth(self):
-        if os.path.exists(f".cache-{self.spotifyUsername}"):
-            os.remove(f".cache-{self.spotifyUsername}")
+        #if os.path.exists(f".cache-{self.spotifyUsername}"):
+            #os.remove(f".cache-{self.spotifyUsername}")
         scope = "user-library-read, playlist-modify-public, playlist-modify-private, user-read-playback-state, streaming"
         clientId = "7b770ecc73434facafdfe5dccace0566"
         clientSecret = "347dff87da6c45ca95cdc71f6c935ceb"
@@ -40,13 +40,6 @@ class MusicSetup(object):
                 tracks = results['tracks']
                 self.addTracks(tracks)
         self.addTracks(self.savedTracks)
-        """for song in self.songs:
-            title = song[0]
-            artist = song[1]
-            if self.getLyrics(title, artist) == None:
-                self.songs.remove(song)
-                    #if trackDict not in self.songInfo:
-                        #self.songInfo.append(trackDict)"""
         return self.songs
 
     def addTracks(self, tracks):
@@ -67,7 +60,9 @@ class MusicSetup(object):
         clientToken = "ouarcaeWjKfIm5LhAydon-2Ii_isvB8g_-P2Z6bpyjJw7D5IMdCk9gP92l5aDs0C"
         genius = lyricsgenius.Genius(clientToken)
         song = genius.search_song(title, artist)
-        return song.lyrics
+        if song != None:
+            return song.lyrics
+        return None
 
     def formatLink(self, word):
         word = word.lower()
@@ -119,13 +114,54 @@ class MusicSetup(object):
             self.sp.start_playback(device_id=deviceID, uris=[])
         else:
             return "cannot find your spotify device (must be desktop app)"
+    
+    def getTitleMatchedSongs(self, relevantWords):
+        songList = []
+        for song in self.songs:
+            title = song[0]
+            for word in relevantWords:
+                if word in title:
+                    songList.append(song)
+        return songList
+    
+    def getSongLyrics(self, songList):
+        lyricDict = dict()
+        others = []
+        for song in songList:
+            title = song[0]
+            artist = song[2]
+            try:
+                lyrics = self.getLyricsV2(title, artist)
+            except:
+                lyrics = None
+            if lyrics != None:
+                lyricDict[(title, song[1])] = lyrics
+            else:
+                others.append(song)
+        for song in others:
+            title = song[0]
+            artist = song[2]
+            lyrics = self.getLyricsWithGenius(title, artist)
+            if lyrics != None:
+                lyricDict[(title, song[1])] = lyrics
+        return lyricDict
+
+
+def countWordOccurrencesInSong(lyricsDict, relevantWords):
+    pass
 
 def runSpotify():
     divMusic = MusicSetup("divviswa")
     divMusic.getSpotifyAuth()
-    #print(divMusic.makeSongSet())
+    #divMusic.makeSongSet()
     #divMusic.getLyrics("Bad to you", "Ariana Grande")
-    #print(divMusic.getLyricsV2("Grammy's Babies", "Cam O'bi"))
-    #print(divMusic.getLyricsWithGenius("Grammy's Babies", "Cam O'bi"))
+    print(divMusic.getLyricsWithGenius("Satellite Lovers", "Nenashi"))
+    print("-----------------------------------------------------")
+    print(divMusic.getLyricsV2("Satellite Lovers", "Nenashi"))
+    #songList = divMusic.getTitleMatchedSongs(["today", "good", "day", "hung", "out", "friends", "ate", "dinner", "together"])
+    #print(songList)
+    #print(divMusic.getSongLyrics(songList))
+
+
 
 runSpotify()

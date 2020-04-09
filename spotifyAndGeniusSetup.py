@@ -1,5 +1,6 @@
 import module_manager
 module_manager.review()
+import copy
 import os
 import spotipy
 import spotipy.util as util
@@ -15,8 +16,8 @@ class MusicSetup(object):
 
     #modified from https://spotipy.readthedocs.io/en/2.9.0/#module-spotipy.client
     def getSpotifyAuth(self):
-        #if os.path.exists(f".cache-{self.spotifyUsername}"):
-            #os.remove(f".cache-{self.spotifyUsername}")
+        if os.path.exists(f".cache-{self.spotifyUsername}"):
+            os.remove(f".cache-{self.spotifyUsername}")
         scope = "user-library-read, playlist-modify-public, playlist-modify-private, user-read-playback-state, streaming"
         clientId = "7b770ecc73434facafdfe5dccace0566"
         clientSecret = "347dff87da6c45ca95cdc71f6c935ceb"
@@ -98,8 +99,13 @@ class MusicSetup(object):
                 return True
         return False
     
-    def createPlaylist(self):
-        self.sp.user_playlist_create(self.spotifyUsername, name="april 6 playlist", public=self.publicPlaylist, description="keywords")
+    def createPlaylist(self, trackIDs, descrip=None):
+        playlistDescrip = descrip
+        self.sp.user_playlist_create(self.spotifyUsername, name="month day playlist", public=self.publicPlaylist, description=playlistDescrip)
+        for item in self.sp.user_playlists(self.spotifyUsername)['items']:
+            if item['name'] == "month day playlist":
+                playlistID = item['id']
+                self.sp.user_playlist_add_tracks(self.spotifyUsername, playlist_id=playlistID, tracks=trackIDs)
     
     def getDeviceID(self):
         deviceInfo = self.sp.devices()['devices']
@@ -108,10 +114,10 @@ class MusicSetup(object):
                 return elem['id']
         return None
 
-    def playSongs(self):
+    def playSongs(self, trackIDs):
         deviceID = self.getDeviceID()
         if deviceID != None:
-            self.sp.start_playback(device_id=deviceID, uris=[])
+            self.sp.start_playback(device_id=deviceID, uris=trackIDs)
         else:
             return "cannot find your spotify device (must be desktop app)"
     
@@ -136,32 +142,96 @@ class MusicSetup(object):
                 lyrics = None
             if lyrics != None:
                 lyricDict[(title, song[1])] = lyrics
-            else:
-                others.append(song)
-        for song in others:
-            title = song[0]
-            artist = song[2]
-            lyrics = self.getLyricsWithGenius(title, artist)
-            if lyrics != None:
-                lyricDict[(title, song[1])] = lyrics
         return lyricDict
+    
+    def getPlaylistTrackIDs(self, songList):
+        trackIDs = []
+        for song in songList:
+            url = song[1]
+            trackIDs.append(url)
+        return trackIDs
 
+def getRelevantWords(journal, nonWords):
+    relevantWords = []
+    for word in journal.split(" "):
+        cleanWord = ""
+        for letter in word:
+            if letter.isalnum():
+                cleanWord += letter
+        if cleanWord not in nonWords and len(cleanWord) >= 3:
+            relevantWords.append(cleanWord)
+    return relevantWords
 
 def countWordOccurrencesInSong(lyricsDict, relevantWords):
-    pass
+    wordOccurrences = dict()
+    for song in lyricsDict:
+        wordOccurrences[song] = dict()
+        wordCounts = wordOccurrences[song]
+        for word in relevantWords:
+            count = 0
+            lyrics = lyricsDict[song]
+            for lyric in lyrics.split():
+                if lyric == word:
+                    count += 1
+            wordCounts[word] = count
+        wordOccurrences[song] = wordCounts
+    return wordOccurrences
+
+def scoreSongs(wordCountsDict):
+    songScores = []
+    for song in wordCountsDict:
+        totalScore = 0
+        title = song[0]
+        url = song[1]
+        wordCounts = wordCountsDict[song]
+        for word in wordCounts:
+            totalScore += wordCounts[word]
+        songScores.append((title, url, totalScore))
+    return songScores
+
+#modified from https://www.cs.cmu.edu/~112/notes/notes-recursion-part1.html#mergesort
+def merge(A, B):
+    C = [ ]
+    i = j = 0
+    while ((i < len(A)) or (j < len(B))):
+        if ((j == len(B)) or ((i < len(A)) and (A[i][2] >= B[j][2]))):
+            C.append(A[i])
+            i += 1
+        else:
+            C.append(B[j])
+            j += 1
+    return C
+
+#uses common mergeSort function
+def rankSongs(songScores):
+    if len(songScores) < 2:
+        return songScores
+    else:
+        mid = len(songScores)//2
+        left = rankSongs(songScores[:mid])
+        right = rankSongs(songScores[mid:])
+        return merge(left, right)
+
+def eliminateNonMatches(rankedSongs):
+    updatedSongs = []
+    for song in rankedSongs:
+        if song[2] > 0:
+            updatedSongs.append(song)
+    return updatedSongs
 
 def runSpotify():
     divMusic = MusicSetup("divviswa")
     divMusic.getSpotifyAuth()
-    #divMusic.makeSongSet()
-    #divMusic.getLyrics("Bad to you", "Ariana Grande")
-    print(divMusic.getLyricsWithGenius("Satellite Lovers", "Nenashi"))
-    print("-----------------------------------------------------")
-    print(divMusic.getLyricsV2("Satellite Lovers", "Nenashi"))
-    #songList = divMusic.getTitleMatchedSongs(["today", "good", "day", "hung", "out", "friends", "ate", "dinner", "together"])
-    #print(songList)
-    #print(divMusic.getSongLyrics(songList))
-
-
+    relevantWords = ["today", "good", "day", "hung", "out", "friends", "ate", "dinner", "together"]
+    relevantWordString = ", ".join(relevantWords)
+    divMusic.makeSongSet()
+    songList = divMusic.getTitleMatchedSongs(relevantWords)
+    lyricsDict = divMusic.getSongLyrics(songList)
+    wordCounts = countWordOccurrencesInSong(lyricsDict, relevantWords)
+    songScores = scoreSongs(wordCounts)
+    rankedSongs = rankSongs(songScores)
+    rankedSongs = eliminateNonMatches(rankedSongs)
+    trackIDs = divMusic.getPlaylistTrackIDs(rankedSongs)
+    divMusic.createPlaylist(trackIDs, descrip=relevantWordString)
 
 runSpotify()

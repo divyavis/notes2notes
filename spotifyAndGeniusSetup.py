@@ -16,8 +16,8 @@ class MusicSetup(object):
 
     #modified from https://spotipy.readthedocs.io/en/2.9.0/#module-spotipy.client
     def getSpotifyAuth(self):
-        #if os.path.exists(f".cache-{self.spotifyUsername}"):
-            #os.remove(f".cache-{self.spotifyUsername}")
+        if os.path.exists(f".cache-{self.spotifyUsername}"):
+            os.remove(f".cache-{self.spotifyUsername}")
         scope = "user-library-read, playlist-modify-public, playlist-modify-private, user-read-playback-state, streaming"
         clientId = "7b770ecc73434facafdfe5dccace0566"
         clientSecret = "347dff87da6c45ca95cdc71f6c935ceb"
@@ -102,7 +102,8 @@ class MusicSetup(object):
     def createPlaylist(self, trackIDs, descrip=None):
         if descrip != None:
             playlistDescrip = f"keywords: {descrip}"
-        playlistDescrip = descrip
+        else:
+            playlistDescrip = descrip
         self.sp.user_playlist_create(self.spotifyUsername, name="month day playlist", public=self.publicPlaylist, description=playlistDescrip)
         for item in self.sp.user_playlists(self.spotifyUsername)['items']:
             if item['name'] == "month day playlist":

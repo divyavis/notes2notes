@@ -1,5 +1,5 @@
 from cmu_112_graphics import *
-import tkinter
+from tkinter import *
 import random
 import calendar
 import os
@@ -32,6 +32,7 @@ class JournalMode(Mode):
     monthRange = calendar.monthrange(currYear, currMonth)
     dateStartCol = monthRange[0]
     lastDate = monthRange[1]
+    currDate = None
     endCol = ((dateStartCol + lastDate) % 7) - 1
     if endCol < 0:
         dateEndCol = 7
@@ -102,6 +103,7 @@ class CalendarMode(JournalMode):
                 (x0, y0, x1, y1) = mode.getCellBounds(row, col)
                 canvas.create_rectangle(x0, y0, x1, y1, fill='cyan')
         mode.drawDates(canvas)
+        canvas.create_text(mode.width//2, (mode.height-(mode.margin//2)), text='Click "b" to go back to home screen', font=f'Helvetica {mode.margin//3} bold')
     
     def keyPressed(mode, event):
         if event.key == 'b':
@@ -180,34 +182,108 @@ class EntryMode(JournalMode):
         mode.margin = mode.height//10
         mode.buttonHeight = mode.height//20
 
+    def mousePressed(mode, event):
+        dirName = f"{os.getcwd()}/journalEntries"
+        if not os.path.exists(dirName):
+            os.mkdir(dirName)
+        if (event.x >= mode.width//3 and event.x <= (2*mode.width)//3) and (event.y >= mode.margin and event.y <= (mode.margin + mode.buttonHeight)):
+            mode.app.setActiveMode(mode.app.textMode)
+    
+    def keyPressed(mode, event):
+        if event.key == 'b':
+            mode.app.setActiveMode(mode.app.calendarMode)
+    
+    #modified from https://www.cs.cmu.edu/~112/notes/notes-strings.html#basicFileIO
+    def readFile(mode, path):
+        try:
+            with open(path, "rt") as f:
+                return f.read()
+        except:
+            return None
+    
+    def formatTxt(mode):
+        path = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}{JournalMode.currDate}{JournalMode.currYear}.txt"
+        journalEntry = mode.readFile(path)
+        if journalEntry != None:
+            textList = []
+            for i in range(len(journalEntry.split())):
+                textList.append(journalEntry.split()[i])
+                if i > 0 and i % 19 == 0:
+                    textList.append("\n")
+            return ' '.join(textList)
+
     def redrawAll(mode, canvas):
         font = f'Helvetica {mode.buttonHeight//2}'
         (row, col) = JournalMode.selection
-        date = None
         for elem in JournalMode.dateLocSet:
             if row == elem[0] and col == elem[1]:
-                date = elem[2]
-        canvas.create_text(mode.width//2, mode.margin//2, text=f"{JournalMode.monthName} {date}, {JournalMode.currYear}", font=f"{font} bold")
+                JournalMode.currDate = elem[2]
+        canvas.create_text(mode.width//2, mode.margin//2, text=f"{JournalMode.monthName} {JournalMode.currDate}, {JournalMode.currYear}", font=f"{font} bold")
         canvas.create_rectangle(mode.width//3, mode.margin, (2*mode.width)//3, (mode.margin + mode.buttonHeight), fill="green")
         canvas.create_text(mode.width//2, (mode.margin + mode.buttonHeight//2), text='Make/edit journal entry', font=font)
-    
-    def mousePressed(mode, event):
-        if (event.x >= mode.width//3 and event.x <= (2*mode.width)//3) and (event.y >= mode.margin and event.y <= (mode.margin + mode.buttonHeight)):
-            mode.app.setActiveMode(mode.app.textMode)
+        canvas.create_rectangle(mode.margin, (2*mode.margin), (mode.width-mode.margin), (mode.height-mode.margin))
+        canvas.create_text(mode.margin, (2*mode.margin), text=mode.formatTxt(), anchor= "nw")
+        canvas.create_text(mode.width//2, (mode.height-(mode.margin//2)), text='Click "b" to go back to calendar screen', font=f'Helvetica {mode.margin//3} bold')
 
 class TextMode(JournalMode):
     def appStarted(mode):
-        window = Tk()
-        width = mode.width
-        height = mode.height
-        window.geometry(f"{width}x{height}")
-        textScreen = Text(window)
-        sideScrollbar = Scrollbar(textScreen)
-        window.mainloop()
+        mode.root = Tk()
+        mode.root.geometry(f"{mode.width}x{mode.height//2}")
+        mode.root.title(f"{JournalMode.monthName} {JournalMode.currDate}, {JournalMode.currYear}")
+        mode.textEntry = Text(mode.root)
+        #sideScrollbar = Scrollbar(textEntry)
+        #sideScrollbar.pack(side=RIGHT)
+        #sideScrollbar.config(command=textEntry.yview)
+        #textEntry.config(yscrollcommand=sideScrollbar.set)
+        mode.textEntry.pack()
+        loadButton = Button(mode.root, command = mode.load, width = mode.width//2, text = "Load Previous")
+        loadButton.pack()
+        saveButton = Button(mode.root, command = mode.save, width = mode.width//2, text = "Save")
+        saveButton.pack()
+        exitButton = Button(mode.root, command = mode.end, width = mode.width//2, text = "Exit")
+        exitButton.pack()
+        mode.root.mainloop()
+    
+    #modified from https://stackoverflow.com/questions/14824163/how-to-get-the-input-from-the-tkinter-text-widget
+    def save(mode):
+        path = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}{JournalMode.currDate}{JournalMode.currYear}.txt"
+        textInput = mode.textEntry.get("1.0", "end-1c")
+        mode.writeFile(path, textInput)
+
+    #from https://www.cs.cmu.edu/~112/notes/notes-strings.html#basicFileIO
+    def writeFile(mode, path, contents):
+        with open(path, "wt") as f:
+            f.write(contents)
+
+    #modified from https://www.cs.cmu.edu/~112/notes/notes-strings.html#basicFileIO
+    def readFile(mode, path):
+        try:
+            with open(path, "rt") as f:
+                return f.read()
+        except:
+            return None
+    
+    def load(mode):
+        path = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}{JournalMode.currDate}{JournalMode.currYear}.txt"
+        textInput = mode.readFile(path)
+        if textInput != None:
+            mode.textEntry.insert(INSERT, textInput)
+        else:
+            mode.textEntry.insert(INSERT, "No previous entry made. Edit this and save to make a new entry.")
+
+    def end(mode):
+        mode.root.destroy()
+    
+    def keyPressed(mode, event):
+        if event.key == 'b':
+            mode.app.setActiveMode(mode.app.entryMode)
+
+    def redrawAll(mode, canvas):
+        canvas.create_text(mode.width//2, (2*mode.height)//3, text='Make a journal entry and click exit on the text widget when done. After exiting, click "b" to go back to the entry screen')
 
 class HelpMode(Mode):
     def redrawAll(mode, canvas):
-        font = 'Arial 26 bold'
+        font = 'Helvetica 26 bold'
         canvas.create_text(mode.width/2, 250, text='(Insert helpful message here)', font=font)
         canvas.create_text(mode.width/2, 350, text='Press "b" to go back to the home screen!', font=font)
 

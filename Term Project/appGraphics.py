@@ -28,11 +28,13 @@ class JournalMode(Mode):
     todaysDate = str(datetime.date.today())
     currYear = int(todaysDate[:4])
     currMonth = int(todaysDate[5:7])
+    currDate = int(todaysDate[8:])
+    monthInt = currMonth
     monthName = None
-    monthRange = calendar.monthrange(currYear, currMonth)
+    monthRange = calendar.monthrange(currYear, monthInt)
     dateStartCol = monthRange[0]
     lastDate = monthRange[1]
-    currDate = None
+    clickedDate = None
     endCol = ((dateStartCol + lastDate) % 7) - 1
     if endCol < 0:
         dateEndCol = 7
@@ -40,18 +42,12 @@ class JournalMode(Mode):
         dateEndCol = endCol
     rows = ((dateStartCol + lastDate)//7) + 1
     dateLocSet = set()
-    text = ''
-    textList = []
-    timerDelay = 100
-    index = 0
-    cursor = ""
-    cursorColor = "white"
 
 class CalendarMode(JournalMode):
     def appStarted(mode):
-        mode.margin = mode.height//10
+        mode.margin = mode.height//8
         mode.cols = 7
-        
+          
     #modified from http://www.cs.cmu.edu/~112/notes/notes-animations-part1.html#exampleGrids
     def pointInGrid(mode, x, y):
         return ((mode.margin <= x <= mode.width-mode.margin) and
@@ -71,28 +67,61 @@ class CalendarMode(JournalMode):
 
     #modified from http://www.cs.cmu.edu/~112/notes/notes-animations-part1.html#exampleGrids
     def getCellBounds(mode, row, col):
-        gridWidth  = mode.width - 2*mode.margin
-        gridHeight = mode.height - 2*mode.margin
-        columnWidth = gridWidth / mode.cols
-        rowHeight = gridHeight / JournalMode.rows
-        x0 = mode.margin + col * columnWidth
-        x1 = mode.margin + (col+1) * columnWidth
-        y0 = mode.margin + row * rowHeight
-        y1 = mode.margin + (row+1) * rowHeight
+        mode.gridWidth  = mode.width - 2*mode.margin
+        mode.gridHeight = mode.height - 2*mode.margin
+        mode.columnWidth = mode.gridWidth / mode.cols
+        mode.rowHeight = mode.gridHeight / JournalMode.rows
+        x0 = mode.margin + col * mode.columnWidth
+        x1 = mode.margin + (col+1) * mode.columnWidth
+        y0 = mode.margin + row * mode.rowHeight
+        y1 = mode.margin + (row+1) * mode.rowHeight
         return (x0, y0, x1, y1)
     
     #modified from http://www.cs.cmu.edu/~112/notes/notes-animations-part1.html#exampleGrids
     def mousePressed(mode, event):
         (row, col) = mode.getCell(event.x, event.y)
         JournalMode.selection = (row, col)
-        if row == 0 and col >= JournalMode.dateStartCol:
-            mode.app.setActiveMode(mode.app.entryMode)
-        elif 0 < row < JournalMode.rows-1:
-            mode.app.setActiveMode(mode.app.entryMode)
-        elif row == JournalMode.rows-1 and col <= JournalMode.dateEndCol:
-            mode.app.setActiveMode(mode.app.entryMode)
+        for elem in JournalMode.dateLocSet:
+            if row == elem[0] and col == elem[1]:
+                JournalMode.clickedDate = elem[2]
+        if JournalMode.clickedDate != None:
+            if JournalMode.monthInt < JournalMode.currMonth or JournalMode.clickedDate <= JournalMode.currDate:
+                if row == 0 and col >= JournalMode.dateStartCol:
+                    mode.app.setActiveMode(mode.app.entryMode)
+                elif 0 < row < JournalMode.rows-1:
+                    mode.app.setActiveMode(mode.app.entryMode)
+                elif row == JournalMode.rows-1 and col <= JournalMode.dateEndCol:
+                    mode.app.setActiveMode(mode.app.entryMode)
+        if (event.x >= (2*mode.margin)//3 and event.x <= (4*mode.margin)//3) and (event.y >= (mode.margin + mode.gridHeight + (mode.margin//4)) and event.y <= (mode.margin + mode.gridHeight + (3*(mode.margin//4)))):
+            if JournalMode.monthInt > 1:
+                JournalMode.monthInt -= 1
+                JournalMode.monthRange = calendar.monthrange(JournalMode.currYear, JournalMode.monthInt)
+                JournalMode.dateStartCol = JournalMode.monthRange[0]
+                JournalMode.lastDate = JournalMode.monthRange[1]
+                JournalMode.endCol = ((JournalMode.dateStartCol + JournalMode.lastDate) % 7) - 1
+                if JournalMode.endCol < 0:
+                    JournalMode.dateEndCol = 7
+                else:
+                    JournalMode.dateEndCol = JournalMode.endCol
+                JournalMode.rows = ((JournalMode.dateStartCol + JournalMode.lastDate)//7) + 1
+                JournalMode.dateLocSet = set()
+        if (event.x >= (mode.width-((4*mode.margin)//3)) and event.x <= (mode.width - ((2*mode.margin)//3))) and (event.y >= (mode.margin + mode.gridHeight + (mode.margin//4)) and event.y <= (mode.margin + mode.gridHeight + (3*(mode.margin//4)))):
+            if JournalMode.monthInt < JournalMode.currMonth:
+                JournalMode.monthInt += 1
+                JournalMode.monthRange = calendar.monthrange(JournalMode.currYear, JournalMode.monthInt)
+                JournalMode.dateStartCol = JournalMode.monthRange[0]
+                JournalMode.lastDate = JournalMode.monthRange[1]
+                JournalMode.endCol = ((JournalMode.dateStartCol + JournalMode.lastDate) % 7) - 1
+                if JournalMode.endCol < 0:
+                    JournalMode.dateEndCol = 7
+                else:
+                    JournalMode.dateEndCol = JournalMode.endCol
+                JournalMode.rows = ((JournalMode.dateStartCol + JournalMode.lastDate)//7) + 1
+                JournalMode.dateLocSet = set()
 
     def redrawAll(mode, canvas):
+        if JournalMode.monthInt < JournalMode.currMonth:
+            mode.nextMonthButton(canvas)
         mode.drawHeader(canvas)
         for row in range(1):
             for col in range(mode.cols):
@@ -103,14 +132,23 @@ class CalendarMode(JournalMode):
                 (x0, y0, x1, y1) = mode.getCellBounds(row, col)
                 canvas.create_rectangle(x0, y0, x1, y1, fill='cyan')
         mode.drawDates(canvas)
-        canvas.create_text(mode.width//2, (mode.height-(mode.margin//2)), text='Click "b" to go back to home screen', font=f'Helvetica {mode.margin//3} bold')
+        canvas.create_text(mode.width//2, (mode.height-(mode.margin//2)), text='Click "b" to go back to home screen', font=f'Helvetica {mode.margin//4} bold')
+        mode.prevMonthButton(canvas)
+
+    def prevMonthButton(mode, canvas):
+        canvas.create_rectangle((2*mode.margin)//3, (mode.margin + mode.gridHeight + (mode.margin//4)), (4*mode.margin)//3, (mode.margin + mode.gridHeight + (3*(mode.margin//4))), fill="green")
+        canvas.create_text(mode.margin, (mode.margin + mode.gridHeight + (mode.margin//2)), text="<--", font=f'Helvetica {mode.margin//3} bold')
     
+    def nextMonthButton(mode, canvas):
+        canvas.create_rectangle((mode.width-((4*mode.margin)//3)), (mode.margin + mode.gridHeight + (mode.margin//4)), (mode.width - ((2*mode.margin)//3)), (mode.margin + mode.gridHeight + (3*(mode.margin//4))), fill="green")
+        canvas.create_text(mode.margin+mode.gridWidth, (mode.margin + mode.gridHeight + (mode.margin//2)), text="-->", font=f'Helvetica {mode.margin//3} bold')
+
     def keyPressed(mode, event):
         if event.key == 'b':
             mode.app.setActiveMode(mode.app.homeMode)
 
     def drawDayText(mode, canvas, col, x0, x1):
-        font = f'Helvetica {mode.margin//5}'
+        font = f'Helvetica {mode.margin//8}'
         xDay = (x0 + x1)/2
         yDay = mode.margin - 10
         if col == 0:
@@ -129,35 +167,35 @@ class CalendarMode(JournalMode):
             canvas.create_text(xDay, yDay, text="Sunday", font=font)
     
     def drawHeader(mode, canvas):
-        font = f'Helvetica {mode.margin//3} bold'
-        if JournalMode.currMonth == 1:
+        font = f'Helvetica {mode.margin//4} bold'
+        if JournalMode.monthInt == 1:
             JournalMode.monthName = "January"
-        elif JournalMode.currMonth == 2:
+        elif JournalMode.monthInt == 2:
             JournalMode.monthName = "February"
-        elif JournalMode.currMonth == 3:
+        elif JournalMode.monthInt == 3:
             JournalMode.monthName = "March"
-        elif JournalMode.currMonth == 4:
+        elif JournalMode.monthInt == 4:
             JournalMode.monthName = "April"
-        elif JournalMode.currMonth == 5:
+        elif JournalMode.monthInt == 5:
             JournalMode.monthName = "May"
-        elif JournalMode.currMonth == 6:
+        elif JournalMode.monthInt == 6:
             JournalMode.monthName = "June"
-        elif JournalMode.currMonth == 7:
+        elif JournalMode.monthInt == 7:
             JournalMode.monthName = "July"
-        elif JournalMode.currMonth == 8:
+        elif JournalMode.monthInt == 8:
             JournalMode.monthName = "August"
-        elif JournalMode.currMonth == 9:
+        elif JournalMode.monthInt == 9:
             JournalMode.monthName = "September"
-        elif JournalMode.currMonth == 10:
+        elif JournalMode.monthInt == 10:
             JournalMode.monthName = "October"
-        elif JournalMode.currMonth == 11:
+        elif JournalMode.monthInt == 11:
             JournalMode.monthName = "November"
-        elif JournalMode.currMonth == 12:
+        elif JournalMode.monthInt == 12:
             JournalMode.monthName = "December"
         canvas.create_text(mode.width//2, mode.margin//2, text=f"{JournalMode.monthName} {JournalMode.currYear}", font=font)
 
     def drawDates(mode, canvas):
-        font = f'Helvetica {mode.margin//5}'
+        font = f'Helvetica {mode.margin//8} bold'
         i = 1
         for row in range(JournalMode.rows):
             for col in range(mode.cols):
@@ -202,7 +240,7 @@ class EntryMode(JournalMode):
             return None
     
     def formatTxt(mode):
-        path = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}{JournalMode.currDate}{JournalMode.currYear}.txt"
+        path = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}{JournalMode.clickedDate}{JournalMode.currYear}.txt"
         journalEntry = mode.readFile(path)
         if journalEntry != None:
             textList = []
@@ -214,11 +252,7 @@ class EntryMode(JournalMode):
 
     def redrawAll(mode, canvas):
         font = f'Helvetica {mode.buttonHeight//2}'
-        (row, col) = JournalMode.selection
-        for elem in JournalMode.dateLocSet:
-            if row == elem[0] and col == elem[1]:
-                JournalMode.currDate = elem[2]
-        canvas.create_text(mode.width//2, mode.margin//2, text=f"{JournalMode.monthName} {JournalMode.currDate}, {JournalMode.currYear}", font=f"{font} bold")
+        canvas.create_text(mode.width//2, mode.margin//2, text=f"{JournalMode.monthName} {JournalMode.clickedDate}, {JournalMode.currYear}", font=f"{font} bold")
         canvas.create_rectangle(mode.width//3, mode.margin, (2*mode.width)//3, (mode.margin + mode.buttonHeight), fill="green")
         canvas.create_text(mode.width//2, (mode.margin + mode.buttonHeight//2), text='Make/edit journal entry', font=font)
         canvas.create_rectangle(mode.margin, (2*mode.margin), (mode.width-mode.margin), (mode.height-mode.margin))
@@ -229,7 +263,7 @@ class TextMode(JournalMode):
     def appStarted(mode):
         mode.root = Tk()
         mode.root.geometry(f"{mode.width}x{mode.height//2}")
-        mode.root.title(f"{JournalMode.monthName} {JournalMode.currDate}, {JournalMode.currYear}")
+        mode.root.title(f"{JournalMode.monthName} {JournalMode.clickedDate}, {JournalMode.currYear}")
         mode.textEntry = Text(mode.root)
         #sideScrollbar = Scrollbar(textEntry)
         #sideScrollbar.pack(side=RIGHT)
@@ -246,7 +280,7 @@ class TextMode(JournalMode):
     
     #modified from https://stackoverflow.com/questions/14824163/how-to-get-the-input-from-the-tkinter-text-widget
     def save(mode):
-        path = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}{JournalMode.currDate}{JournalMode.currYear}.txt"
+        path = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}{JournalMode.clickedDate}{JournalMode.currYear}.txt"
         textInput = mode.textEntry.get("1.0", "end-1c")
         mode.writeFile(path, textInput)
 
@@ -264,7 +298,7 @@ class TextMode(JournalMode):
             return None
     
     def load(mode):
-        path = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}{JournalMode.currDate}{JournalMode.currYear}.txt"
+        path = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}{JournalMode.clickedDate}{JournalMode.currYear}.txt"
         textInput = mode.readFile(path)
         if textInput != None:
             mode.textEntry.insert(INSERT, textInput)

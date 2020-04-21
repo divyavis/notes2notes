@@ -3,17 +3,35 @@ from tkinter import *
 import random
 import calendar
 import os
+from musicSetup import *
+from journalReading import *
 
 class HomeMode(Mode):
     def appStarted(mode):
         mode.buttonHeight = mode.height//20
+        mode.path = f"{os.getcwd()}/spotifyUsername.txt"
+
+    #from https://www.cs.cmu.edu/~112/notes/notes-strings.html#basicFileIO
+    def writeFile(mode, path, contents):
+        with open(path, "wt") as f:
+            f.write(contents)
     
+    #modified from https://www.cs.cmu.edu/~112/notes/notes-strings.html#basicFileIO
+    def readFile(mode, path):
+        with open(path, "rt") as f:
+            return f.read()
+
     def redrawAll(mode, canvas):
         font = f'Helvetica {mode.buttonHeight//2} bold'
         canvas.create_text(mode.width//2, mode.height//4, text='Welcome to Notes2Notes', font=font)
         canvas.create_text(mode.width//2, mode.height//3, text='Click "h" for instructions on how to use your journal', font=font)
         canvas.create_rectangle(mode.width//3, ((mode.height//2)-(mode.buttonHeight//2)), (2*mode.width)//3, ((mode.height//2)+(mode.buttonHeight//2)), fill="green")
         canvas.create_text(mode.width//2, mode.height//2, text='See your journal', font=font)
+        canvas.create_rectangle(mode.width//3, ((mode.height//2+(2*mode.buttonHeight))-(mode.buttonHeight//2)), (2*mode.width)//3, ((mode.height//2+(2*mode.buttonHeight))+(mode.buttonHeight//2)), fill="green")
+        if not os.path.exists(mode.path):
+            canvas.create_text(mode.width//2, (mode.height//2)+(2*mode.buttonHeight), text='Connect Spotify', font=font)
+        else:
+            canvas.create_text(mode.width//2, (mode.height//2)+(2*mode.buttonHeight), text='Spotify Connected!', font=font)
 
     def keyPressed(mode, event):
         if event.key == 'h':
@@ -21,7 +39,24 @@ class HomeMode(Mode):
     
     def mousePressed(mode, event):
         if (event.x >= mode.width//3 and event.x <= (2*mode.width)//3) and (event.y >= (mode.height//2)-(mode.buttonHeight//2) and event.y <= (mode.height//2)+(mode.buttonHeight//2)):
+            if os.path.exists(mode.path):
+                username = mode.readFile
+                userMusic = MusicSetup(username)
             mode.app.setActiveMode(mode.app.calendarMode)
+        if (event.x >= mode.width//3 and event.x <= (2*mode.width)//3) and (event.y >= (mode.height//2+(2*mode.buttonHeight))-(mode.buttonHeight//2) and event.y <= (mode.height//2+(2*mode.buttonHeight))+(mode.buttonHeight//2)):
+            if not os.path.exists(mode.path):
+                print("hi")
+                mode.checkAuth()
+    
+    def checkAuth(mode):
+        username = mode.getUserInput("Enter your Spotify username")
+        mode.userMusic = MusicSetup(username)
+        if mode.userMusic.gotAuth:
+            mode.writeFile(mode.path, username)
+            return None
+        else:
+            mode.showMessage('Authentication failed. Please try again.')
+            mode.checkAuth()
 
 class JournalMode(Mode):
     selection = (-1, -1)
@@ -219,18 +254,35 @@ class EntryMode(JournalMode):
     def appStarted(mode):
         mode.margin = mode.height//10
         mode.buttonHeight = mode.height//20
+        mode.path = None
 
     def mousePressed(mode, event):
         dirName = f"{os.getcwd()}/journalEntries"
         if not os.path.exists(dirName):
             os.mkdir(dirName)
-        if (event.x >= mode.width//3 and event.x <= (2*mode.width)//3) and (event.y >= mode.margin and event.y <= (mode.margin + mode.buttonHeight)):
-            mode.app.setActiveMode(mode.app.textMode)
-    
+        if (event.x >= 2*mode.margin and event.x <= (mode.width//2)-mode.margin) and (event.y >= mode.margin and event.y <= (mode.margin + mode.buttonHeight)):
+            mode.root = Tk()
+            mode.root.geometry(f"{mode.width}x{mode.height//2}")
+            mode.root.title(f"{JournalMode.monthName} {JournalMode.clickedDate}, {JournalMode.currYear}")
+            mode.textEntry = Text(mode.root)
+            #sideScrollbar = Scrollbar(textEntry)
+            #sideScrollbar.pack(side=RIGHT)
+            #sideScrollbar.config(command=textEntry.yview)
+            #textEntry.config(yscrollcommand=sideScrollbar.set)
+            mode.textEntry.pack()
+            loadButton = Button(mode.root, command = mode.load, width = mode.width//2, text = "Load Previous")
+            loadButton.pack()
+            saveButton = Button(mode.root, command = mode.save, width = mode.width//2, text = "Save")
+            saveButton.pack()
+            exitButton = Button(mode.root, command = mode.end, width = mode.width//2, text = "Exit")
+            exitButton.pack()
+        if (event.x >= (mode.width//2)+mode.margin and event.x <= mode.width-(2*mode.margin)) and (event.y >= mode.margin and event.y <= (mode.margin + mode.buttonHeight)):
+            mode.app.setActiveMode(mode.app.playlistMode)
+
     def keyPressed(mode, event):
         if event.key == 'b':
             mode.app.setActiveMode(mode.app.calendarMode)
-    
+
     #modified from https://www.cs.cmu.edu/~112/notes/notes-strings.html#basicFileIO
     def readFile(mode, path):
         try:
@@ -240,44 +292,24 @@ class EntryMode(JournalMode):
             return None
     
     def formatTxt(mode):
-        path = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}{JournalMode.clickedDate}{JournalMode.currYear}.txt"
-        journalEntry = mode.readFile(path)
-        if journalEntry != None:
-            textList = []
-            for i in range(len(journalEntry.split())):
-                textList.append(journalEntry.split()[i])
-                if i > 0 and i % 19 == 0:
-                    textList.append("\n")
-            return ' '.join(textList)
+        mode.path = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}{JournalMode.clickedDate}{JournalMode.currYear}.txt"
+        journalEntry = mode.readFile(mode.path)
+        return journalEntry
 
     def redrawAll(mode, canvas):
         font = f'Helvetica {mode.buttonHeight//2}'
-        canvas.create_text(mode.width//2, mode.margin//2, text=f"{JournalMode.monthName} {JournalMode.clickedDate}, {JournalMode.currYear}", font=f"{font} bold")
-        canvas.create_rectangle(mode.width//3, mode.margin, (2*mode.width)//3, (mode.margin + mode.buttonHeight), fill="green")
-        canvas.create_text(mode.width//2, (mode.margin + mode.buttonHeight//2), text='Make/edit journal entry', font=font)
+        canvas.create_text(mode.width//2, mode.margin//2, text=f"{JournalMode.monthName} {JournalMode.clickedDate}, {JournalMode.currYear}", font=f'Helvetica {mode.buttonHeight} bold')
+        canvas.create_rectangle(2*mode.margin, mode.margin, (mode.width//2)-mode.margin, (mode.margin + mode.buttonHeight), fill="green")
+        textCenterX1 = 2*mode.margin + (((mode.width//2)-mode.margin) - (2*mode.margin))//2
+        canvas.create_text(textCenterX1, (mode.margin + mode.buttonHeight//2), text='Make/edit journal entry', font=f'Helvetica {mode.buttonHeight//3}')
+        textCenterX2 = ((mode.width//2)+mode.margin) + ((mode.width-(2*mode.margin)) - ((mode.width//2)+mode.margin))//2
+        canvas.create_rectangle((mode.width//2)+mode.margin, mode.margin, mode.width-(2*mode.margin), (mode.margin + mode.buttonHeight), fill="green")
+        canvas.create_text(textCenterX2, (mode.margin + mode.buttonHeight//2), text='Create playlist', font=f'Helvetica {mode.buttonHeight//3}')
         canvas.create_rectangle(mode.margin, (2*mode.margin), (mode.width-mode.margin), (mode.height-mode.margin))
-        canvas.create_text(mode.margin, (2*mode.margin), text=mode.formatTxt(), anchor= "nw")
-        canvas.create_text(mode.width//2, (mode.height-(mode.margin//2)), text='Click "b" to go back to calendar screen', font=f'Helvetica {mode.margin//3} bold')
+        if mode.formatTxt() != None:
+            canvas.create_text(mode.margin, (2*mode.margin), text=mode.formatTxt(), anchor= "nw", width=mode.width-(2*mode.margin))
+        canvas.create_text(mode.width//2, (mode.height-(mode.margin//2)), text='Click "b" to go back to calendar screen. Only create a playlist when journal entry is fully complete!', font=f'Helvetica {mode.margin//5} bold')
 
-class TextMode(JournalMode):
-    def appStarted(mode):
-        mode.root = Tk()
-        mode.root.geometry(f"{mode.width}x{mode.height//2}")
-        mode.root.title(f"{JournalMode.monthName} {JournalMode.clickedDate}, {JournalMode.currYear}")
-        mode.textEntry = Text(mode.root)
-        #sideScrollbar = Scrollbar(textEntry)
-        #sideScrollbar.pack(side=RIGHT)
-        #sideScrollbar.config(command=textEntry.yview)
-        #textEntry.config(yscrollcommand=sideScrollbar.set)
-        mode.textEntry.pack()
-        loadButton = Button(mode.root, command = mode.load, width = mode.width//2, text = "Load Previous")
-        loadButton.pack()
-        saveButton = Button(mode.root, command = mode.save, width = mode.width//2, text = "Save")
-        saveButton.pack()
-        exitButton = Button(mode.root, command = mode.end, width = mode.width//2, text = "Exit")
-        exitButton.pack()
-        mode.root.mainloop()
-    
     #modified from https://stackoverflow.com/questions/14824163/how-to-get-the-input-from-the-tkinter-text-widget
     def save(mode):
         path = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}{JournalMode.clickedDate}{JournalMode.currYear}.txt"
@@ -289,14 +321,6 @@ class TextMode(JournalMode):
         with open(path, "wt") as f:
             f.write(contents)
 
-    #modified from https://www.cs.cmu.edu/~112/notes/notes-strings.html#basicFileIO
-    def readFile(mode, path):
-        try:
-            with open(path, "rt") as f:
-                return f.read()
-        except:
-            return None
-    
     def load(mode):
         path = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}{JournalMode.clickedDate}{JournalMode.currYear}.txt"
         textInput = mode.readFile(path)
@@ -307,13 +331,19 @@ class TextMode(JournalMode):
 
     def end(mode):
         mode.root.destroy()
-    
+
+class PlaylistMode(Mode):
+    def appStarted(mode):
+        pass
+
+    def redrawAll(mode, canvas):
+        font = 'Helvetica 26 bold'
+        canvas.create_text(mode.width/2, 250, text='this is where users enter preferences to make playlist', font=font)
+        canvas.create_text(mode.width/2, 350, text='Press "b" to go back to the entry screen!', font=font)
+
     def keyPressed(mode, event):
         if event.key == 'b':
             mode.app.setActiveMode(mode.app.entryMode)
-
-    def redrawAll(mode, canvas):
-        canvas.create_text(mode.width//2, (2*mode.height)//3, text='Make a journal entry and click exit on the text widget when done. After exiting, click "b" to go back to the entry screen')
 
 class HelpMode(Mode):
     def redrawAll(mode, canvas):
@@ -331,7 +361,7 @@ class MyModalApp(ModalApp):
         app.calendarMode = CalendarMode()
         app.helpMode = HelpMode()
         app.entryMode = EntryMode()
-        app.textMode = TextMode()
+        app.playlistMode = PlaylistMode()
         app.setActiveMode(app.homeMode)
 
 app = MyModalApp(width=800, height=800)

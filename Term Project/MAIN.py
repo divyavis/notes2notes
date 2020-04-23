@@ -119,6 +119,7 @@ class JournalMode(Mode):
         dateEndCol = endCol
     rows = ((dateStartCol + lastDate)//7) + 1
     dateLocSet = set()
+    playlistCreated = False
 
 class CalendarMode(JournalMode):
     def appStarted(mode):
@@ -325,7 +326,7 @@ class EntryMode(JournalMode):
             exitButton = Button(mode.root, command = mode.end, width = mode.width//2, text = "Exit")
             exitButton.pack()
         if (event.x >= (mode.width//2)+mode.margin and event.x <= mode.width-(2*mode.margin)) and (event.y >= mode.margin and event.y <= (mode.margin + mode.buttonHeight)):
-            mode.app.setActiveMode(mode.app.playlistMode)
+            mode.app.setActiveMode(mode.app.dailyPlaylistMode)
 
     def keyPressed(mode, event):
         if event.key == 'b':
@@ -355,7 +356,7 @@ class EntryMode(JournalMode):
         canvas.create_text(textCenterX2, (mode.margin + mode.buttonHeight//2), text='Create playlist', font=f'ComicSansMS {mode.buttonHeight//3}')
         canvas.create_rectangle(mode.margin, (2*mode.margin), (mode.width-mode.margin), (mode.height-mode.margin), fill=mode.manila)
         if mode.formatTxt() != None:
-            canvas.create_text(mode.margin+5, (2*mode.margin)+5, text=mode.formatTxt(), anchor= "nw", width=mode.width-((2*mode.margin)-10), font="Helvetica 15")
+            canvas.create_text(mode.margin+5, (2*mode.margin)+5, text=mode.formatTxt(), anchor= "nw", width=mode.width-((2*mode.margin)+5), font="Helvetica 15")
         canvas.create_text(mode.width//2, (mode.height-(mode.margin//2)), text='Click "b" to go back to calendar screen. Only create a playlist when journal entry is fully complete!', font=f'ComicSansMS {mode.margin//5}')
 
     #modified from https://stackoverflow.com/questions/14824163/how-to-get-the-input-from-the-tkinter-text-widget
@@ -380,7 +381,7 @@ class EntryMode(JournalMode):
     def end(mode):
         mode.root.destroy()
 
-class PlaylistMode(JournalMode):
+class DailyPlaylistMode(JournalMode):
     def appStarted(mode):
         mode.margin = mode.height//10
         mode.manila = rgbString(250, 240, 190)
@@ -389,9 +390,19 @@ class PlaylistMode(JournalMode):
         mode.buttonHeight = mode.height//20
         mode.buttonWidth = mode.width//5
         mode.darkGray = rgbString(40, 40, 40)
+        mode.journalPath = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}{JournalMode.clickedDate}{JournalMode.currYear}.txt"
+        if os.path.exists(mode.journalPath):
+            mode.journalAnalysis = JournalSetup()
+            mode.journalAnalysis.readSingleEntry(mode.journalPath)
+            if mode.journalAnalysis.journal == "":
+                mode.app.setActiveMode(mode.app.entryMode)
+            mode.relevantWords = mode.journalAnalysis.getRelevantWords()
+        else:
+            mode.app.setActiveMode(mode.app.entryMode)
+            #ask y showMessage isn't working (Exception: 'DailyPlaylistMode' object has no attribute '_root')
         if os.path.exists(usernamePath):
             username = readFile(usernamePath)
-            userMusic = MusicSetup(username)
+            mode.userMusic = MusicSetup(username)
         else:
             mode.showMessage('Please go back to the home screen and connect your Spotify.')
         mode.maxSongs = ""
@@ -422,7 +433,10 @@ class PlaylistMode(JournalMode):
             mode.drawPrivateButton(mode.seafoamGreen, canvas)
         canvas.create_text(mode.width//2, 4*mode.margin, text="Max number of songs in playlist (skip if no preference):", font=f'ComicSansMS {mode.margin//3} bold')
         canvas.create_rectangle(mode.width//3, 4*mode.margin+mode.buttonHeight, (2*mode.width)//3, 4*mode.margin+(2*mode.buttonHeight), fill=mode.manila)
-        if mode.maxSongs != None and mode.maxSongs.isdigit():
+        if (mode.maxSongs != None and isinstance(mode.maxSongs, str) and mode.maxSongs.isdigit()):
+            maxSongText = f"Max songs: {mode.maxSongs}"
+            canvas.create_text(mode.width//2, (4*mode.margin+mode.buttonHeight)+mode.buttonHeight//2, text=maxSongText, font=f'ComicSansMS {mode.margin//4}')
+        elif (mode.maxSongs != None and isinstance(mode.maxSongs, int)):
             maxSongText = f"Max songs: {mode.maxSongs}"
             canvas.create_text(mode.width//2, (4*mode.margin+mode.buttonHeight)+mode.buttonHeight//2, text=maxSongText, font=f'ComicSansMS {mode.margin//4}')
         else:
@@ -437,6 +451,8 @@ class PlaylistMode(JournalMode):
         else:
             descripText = "Click here to enter custom description"
             canvas.create_text(mode.width//2, 6*mode.margin+(2*mode.buttonHeight), text=descripText, font=f'ComicSansMS {mode.margin//4} bold')
+        canvas.create_rectangle(mode.width//3, 8*mode.margin+mode.buttonHeight//2, (2*mode.width)//3, 8*mode.margin+(2*mode.buttonHeight), fill=mode.darkGray)
+        canvas.create_text(mode.width//2, (8*mode.margin+mode.buttonHeight//2)+(2*mode.buttonHeight)//3, text="Create Playlist", fill=mode.seafoamGreen, font=f"ComicSansMS {mode.margin//3} bold")
 
     def mousePressed(mode, event):
         if (event.x >= mode.width//2 - mode.buttonHeight - mode.buttonWidth and event.x <= (mode.width//2 - mode.buttonHeight)) and (event.y >= 2*mode.margin + mode.buttonHeight and event.y <= (2*mode.margin + 2*mode.buttonHeight)):
@@ -451,6 +467,45 @@ class PlaylistMode(JournalMode):
             mode.descrip = mode.getUserInput("Enter your custom description for your playlist")
             if mode.descrip == None:
                 mode.descrip = ""
+        if (event.x >= mode.width//3 and event.x <= (2*mode.width)//3) and (event.y >= (8*mode.margin+mode.buttonHeight//2)+(2*mode.buttonHeight)//3 and event.y <= 8*mode.margin+(2*mode.buttonHeight)):
+            mode.userMusic.makeSongSet()
+            print("made songSet")
+            mode.songList = mode.userMusic.getTitleMatchedSongs(mode.relevantWords)
+            print("made title matches")
+            mode.lyricDict = mode.userMusic.getSongLyrics(mode.songList)
+            print("made lyricDict")
+            mode.wordCounts = mode.journalAnalysis.countWordOccurrencesInSong(mode.lyricDict)
+            print("made wordCounts")
+            mode.songScores = mode.journalAnalysis.scoreSongs()
+            print("got song scores")
+            mode.rankedSongs = mode.journalAnalysis.rankSongs(mode.songScores)
+            print("ranked songs")
+            if (isinstance(mode.maxSongs, str) and mode.maxSongs != "" and mode.maxSongs.isdigit()):
+                mode.maxSongs = int(mode.maxSongs)
+                mode.rankedSongs = mode.journalAnalysis.eliminateNonMatches(mode.rankedSongs, maxSongs=mode.maxSongs)
+            elif (isinstance(mode.maxSongs, int)):
+                mode.rankedSongs = mode.journalAnalysis.eliminateNonMatches(mode.rankedSongs, maxSongs=mode.maxSongs)
+            else:
+                mode.rankedSongs = mode.journalAnalysis.eliminateNonMatches(mode.rankedSongs)
+            print("eliminated non matches")
+            mode.trackIDs = mode.userMusic.getPlaylistTrackIDs(mode.rankedSongs)
+            print("got track ids")
+            if mode.descrip != "":
+                if mode.publicButton == True or mode.publicButton == False:
+                    mode.userMusic.createPlaylist(mode.trackIDs, JournalMode.monthName, day=JournalMode.clickedDate, publicP= mode.publicButton, descrip=mode.descrip)
+                mode.playPlaylist = mode.getUserInput('Playlist created! If you would like to play the songs now, type "yes" or click "Cancel" if not.')
+                if mode.playPlaylist != None:
+                    if mode.playPlaylist.lower() == 'yes':
+                        mode.userMusic.playSongs(mode.trackIDs)
+            else:
+                mode.keywords = mode.journalAnalysis.getKeywordsUsed()
+                mode.keywords = (", ").join(mode.keywords)
+                if mode.publicButton == True or mode.publicButton == False:
+                    mode.userMusic.createPlaylist(mode.trackIDs, JournalMode.monthName, day=JournalMode.clickedDate, publicP= mode.publicButton, descrip=f"keywords: {mode.keywords}")
+                mode.playPlaylist = mode.getUserInput('Playlist created! If you would like to play the songs now, type "yes" or click "Cancel" if not.')
+                if mode.playPlaylist != None:
+                    if mode.playPlaylist.lower() == 'yes':
+                        mode.userMusic.playSongs(mode.trackIDs)
 
     def keyPressed(mode, event):
         if event.key == 'b':
@@ -475,7 +530,7 @@ class MyModalApp(ModalApp):
         app.calendarMode = CalendarMode()
         app.helpMode = HelpMode()
         app.entryMode = EntryMode()
-        app.playlistMode = PlaylistMode()
+        app.dailyPlaylistMode = DailyPlaylistMode()
         app.setActiveMode(app.homeMode)
 
 if not os.path.exists(usernamePath):

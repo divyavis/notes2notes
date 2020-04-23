@@ -211,7 +211,6 @@ class CalendarMode(JournalMode):
                 JournalMode.dateLocSet = set()
         if (event.x >= mode.width//2-mode.margin and event.x <= mode.width//2+mode.margin) and (event.y >= mode.height-(mode.margin//2) and event.y <= mode.height-(mode.margin//4)):
             dirName = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}"
-            print(os.listdir(dirName))
             if not os.path.exists(dirName):
                 pass
             elif len(os.listdir(dirName)) < 2:
@@ -418,14 +417,11 @@ class PlaylistMode(JournalMode):
             mode.journalAnalysis = JournalSetup()
             bigJournal = ""
             for entry in dirList:
-                print(entry)
                 smallJournal = mode.journalAnalysis.readSingleEntry(f"{os.getcwd()}/journalEntries/{JournalMode.monthName}/{entry}")
-                print(smallJournal)
                 if smallJournal == "":
                     continue
                 else:
                     bigJournal += '\n' + smallJournal
-            print(bigJournal)
             if len(bigJournal) > 20:
                 mode.relevantWords = mode.journalAnalysis.getRelevantWords(bigJournal)
             else:

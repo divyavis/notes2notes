@@ -8,6 +8,18 @@ import os
 from musicSetup import *
 from journalReading import *
 
+#add reset user button
+#logout button
+#get out button after playing songs
+#loading screen
+#indicate on calendar screen when someone has made an entry
+#google calendar syncing?
+#public spotify playlists
+#nlp
+#query by spotify username
+#get public spotify playlists of followers
+#other knob direction
+
 #one global variable used is usernamePath to make sure Spotify is authenticated properly everytime app is opened
 usernamePath = f"{os.getcwd()}/spotifyUsername.txt"
 
@@ -59,9 +71,7 @@ class HomeMode(Mode):
     def redrawAll(mode, canvas):
         font = f'ComicSansMS {mode.buttonHeight//2} bold'
         canvas.create_rectangle(0, 0, mode.width, mode.height, fill=mode.manila)
-        #canvas.create_image(200, 300, image=ImageTk.PhotoImage(mode.image1))
         canvas.create_image(mode.width//2, mode.height//4, image=ImageTk.PhotoImage(mode.image2))
-        #canvas.create_text(mode.width//2, mode.height//4, text='Welcome to Notes2Notes', font=font)
         canvas.create_text(mode.width//2, (mode.height//2)+(4*mode.buttonHeight), text='Click "h" for instructions on how to use your journal', font=font, fill=mode.darkGray)
         canvas.create_rectangle(mode.width//3, ((mode.height//2)-(mode.buttonHeight//2)), (2*mode.width)//3, ((mode.height//2)+(mode.buttonHeight//2)), fill=mode.darkGray)
         canvas.create_text(mode.width//2, mode.height//2, text='See your journal', font=font, fill=mode.manila)
@@ -119,7 +129,7 @@ class JournalMode(Mode):
         dateEndCol = endCol
     rows = ((dateStartCol + lastDate)//7) + 1
     dateLocSet = set()
-    playlistCreated = False
+    monthlyPlaylist = False
 
 class CalendarMode(JournalMode):
     def appStarted(mode):
@@ -199,6 +209,16 @@ class CalendarMode(JournalMode):
                     JournalMode.dateEndCol = JournalMode.endCol
                 JournalMode.rows = ((JournalMode.dateStartCol + JournalMode.lastDate)//7) + 1
                 JournalMode.dateLocSet = set()
+        if (event.x >= mode.width//2-mode.margin and event.x <= mode.width//2+mode.margin) and (event.y >= mode.height-(mode.margin//2) and event.y <= mode.height-(mode.margin//4)):
+            dirName = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}"
+            print(os.listdir(dirName))
+            if not os.path.exists(dirName):
+                pass
+            elif len(os.listdir(dirName)) < 2:
+                pass
+            else:
+                JournalMode.monthlyPlaylist = True
+                mode.app.setActiveMode(mode.app.playlistMode)
 
     def redrawAll(mode, canvas):
         if JournalMode.monthInt < JournalMode.currMonth:
@@ -213,8 +233,10 @@ class CalendarMode(JournalMode):
                 (x0, y0, x1, y1) = mode.getCellBounds(row, col)
                 canvas.create_rectangle(x0, y0, x1, y1, fill=mode.manila)
         mode.drawDates(canvas)
-        canvas.create_text(mode.width//2, (mode.height-(mode.margin//2)), text='Click "b" to go back to home screen', font=f'ComicSansMS {mode.margin//4} bold')
+        canvas.create_text(mode.width//2, (mode.height-(3*mode.margin)//4), text='Click "b" to go back to the home screen', font=f'ComicSansMS {mode.margin//5} bold')
         mode.prevMonthButton(canvas)
+        canvas.create_rectangle(mode.width//2-mode.margin, mode.height-(mode.margin//2), mode.width//2+mode.margin, mode.height-(mode.margin//4), fill=mode.seafoamGreen)
+        canvas.create_text(mode.width//2, mode.height-(2*mode.margin)//5, text="Create playlist", font=f'ComicSansMS {mode.margin//6} bold')
 
     def prevMonthButton(mode, canvas):
         canvas.create_rectangle((2*mode.margin)//3, (mode.margin + mode.gridHeight + (mode.margin//4)), (4*mode.margin)//3, (mode.margin + mode.gridHeight + (3*(mode.margin//4))), fill=mode.seafoamGreen)
@@ -306,9 +328,9 @@ class EntryMode(JournalMode):
         mode.darkGray = rgbString(40, 40, 40)
 
     def mousePressed(mode, event):
-        dirName = f"{os.getcwd()}/journalEntries"
+        dirName = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}"
         if not os.path.exists(dirName):
-            os.mkdir(dirName)
+            os.makedirs(dirName)
         if (event.x >= 2*mode.margin and event.x <= (mode.width//2)-mode.margin) and (event.y >= mode.margin and event.y <= (mode.margin + mode.buttonHeight)):
             mode.root = Tk()
             mode.root.geometry(f"{mode.width}x{mode.height//2}")
@@ -326,7 +348,7 @@ class EntryMode(JournalMode):
             exitButton = Button(mode.root, command = mode.end, width = mode.width//2, text = "Exit")
             exitButton.pack()
         if (event.x >= (mode.width//2)+mode.margin and event.x <= mode.width-(2*mode.margin)) and (event.y >= mode.margin and event.y <= (mode.margin + mode.buttonHeight)):
-            mode.app.setActiveMode(mode.app.dailyPlaylistMode)
+            mode.app.setActiveMode(mode.app.playlistMode)
 
     def keyPressed(mode, event):
         if event.key == 'b':
@@ -341,7 +363,7 @@ class EntryMode(JournalMode):
             return None
     
     def formatTxt(mode):
-        mode.path = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}{JournalMode.clickedDate}{JournalMode.currYear}.txt"
+        mode.path = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}/{JournalMode.monthName}{JournalMode.clickedDate}{JournalMode.currYear}.txt"
         journalEntry = mode.readFile(mode.path)
         return journalEntry
 
@@ -361,7 +383,7 @@ class EntryMode(JournalMode):
 
     #modified from https://stackoverflow.com/questions/14824163/how-to-get-the-input-from-the-tkinter-text-widget
     def save(mode):
-        path = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}{JournalMode.clickedDate}{JournalMode.currYear}.txt"
+        path = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}/{JournalMode.monthName}{JournalMode.clickedDate}{JournalMode.currYear}.txt"
         textInput = mode.textEntry.get("1.0", "end-1c")
         mode.writeFile(path, textInput)
 
@@ -371,7 +393,7 @@ class EntryMode(JournalMode):
             f.write(contents)
 
     def load(mode):
-        path = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}{JournalMode.clickedDate}{JournalMode.currYear}.txt"
+        path = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}/{JournalMode.monthName}{JournalMode.clickedDate}{JournalMode.currYear}.txt"
         textInput = mode.readFile(path)
         if textInput != None:
             mode.textEntry.insert(INSERT, textInput)
@@ -381,7 +403,7 @@ class EntryMode(JournalMode):
     def end(mode):
         mode.root.destroy()
 
-class DailyPlaylistMode(JournalMode):
+class PlaylistMode(JournalMode):
     def appStarted(mode):
         mode.margin = mode.height//10
         mode.manila = rgbString(250, 240, 190)
@@ -390,16 +412,36 @@ class DailyPlaylistMode(JournalMode):
         mode.buttonHeight = mode.height//20
         mode.buttonWidth = mode.width//5
         mode.darkGray = rgbString(40, 40, 40)
-        mode.journalPath = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}{JournalMode.clickedDate}{JournalMode.currYear}.txt"
-        if os.path.exists(mode.journalPath):
+        if JournalMode.monthlyPlaylist == True:
+            dirName = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}"
+            dirList = os.listdir(dirName)
             mode.journalAnalysis = JournalSetup()
-            mode.journalAnalysis.readSingleEntry(mode.journalPath)
-            if mode.journalAnalysis.journal == "":
-                mode.app.setActiveMode(mode.app.entryMode)
-            mode.relevantWords = mode.journalAnalysis.getRelevantWords()
+            bigJournal = ""
+            for entry in dirList:
+                print(entry)
+                smallJournal = mode.journalAnalysis.readSingleEntry(f"{os.getcwd()}/journalEntries/{JournalMode.monthName}/{entry}")
+                print(smallJournal)
+                if smallJournal == "":
+                    continue
+                else:
+                    bigJournal += '\n' + smallJournal
+            print(bigJournal)
+            if len(bigJournal) > 20:
+                mode.relevantWords = mode.journalAnalysis.getRelevantWords(bigJournal)
+            else:
+                JournalMode.monthlyPlaylist = False
+                mode.app.setActiveMode(mode.app.calendarMode)
         else:
-            mode.app.setActiveMode(mode.app.entryMode)
-            #ask y showMessage isn't working (Exception: 'DailyPlaylistMode' object has no attribute '_root')
+            mode.journalPath = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}/{JournalMode.monthName}{JournalMode.clickedDate}{JournalMode.currYear}.txt"
+            if os.path.exists(mode.journalPath):
+                mode.journalAnalysis = JournalSetup()
+                journalEntry = mode.journalAnalysis.readSingleEntry(mode.journalPath)
+                if journalEntry == "":
+                    mode.app.setActiveMode(mode.app.entryMode)
+                mode.relevantWords = mode.journalAnalysis.getRelevantWords(journalEntry)
+            else:
+                mode.app.setActiveMode(mode.app.entryMode)
+                #ask y showMessage isn't working (Exception: 'DailyPlaylistMode' object has no attribute '_root')
         if os.path.exists(usernamePath):
             username = readFile(usernamePath)
             mode.userMusic = MusicSetup(username)
@@ -453,6 +495,7 @@ class DailyPlaylistMode(JournalMode):
             canvas.create_text(mode.width//2, 6*mode.margin+(2*mode.buttonHeight), text=descripText, font=f'ComicSansMS {mode.margin//4} bold')
         canvas.create_rectangle(mode.width//3, 8*mode.margin+mode.buttonHeight//2, (2*mode.width)//3, 8*mode.margin+(2*mode.buttonHeight), fill=mode.darkGray)
         canvas.create_text(mode.width//2, (8*mode.margin+mode.buttonHeight//2)+(2*mode.buttonHeight)//3, text="Create Playlist", fill=mode.seafoamGreen, font=f"ComicSansMS {mode.margin//3} bold")
+        canvas.create_text(mode.width//2, mode.height - mode.margin//2, text='Click "b" to go back to the calendar screen', font=f'ComicSansMS {mode.margin//4} bold')
 
     def mousePressed(mode, event):
         if (event.x >= mode.width//2 - mode.buttonHeight - mode.buttonWidth and event.x <= (mode.width//2 - mode.buttonHeight)) and (event.y >= 2*mode.margin + mode.buttonHeight and event.y <= (2*mode.margin + 2*mode.buttonHeight)):
@@ -469,17 +512,11 @@ class DailyPlaylistMode(JournalMode):
                 mode.descrip = ""
         if (event.x >= mode.width//3 and event.x <= (2*mode.width)//3) and (event.y >= (8*mode.margin+mode.buttonHeight//2)+(2*mode.buttonHeight)//3 and event.y <= 8*mode.margin+(2*mode.buttonHeight)):
             mode.userMusic.makeSongSet()
-            print("made songSet")
             mode.songList = mode.userMusic.getTitleMatchedSongs(mode.relevantWords)
-            print("made title matches")
             mode.lyricDict = mode.userMusic.getSongLyrics(mode.songList)
-            print("made lyricDict")
             mode.wordCounts = mode.journalAnalysis.countWordOccurrencesInSong(mode.lyricDict)
-            print("made wordCounts")
             mode.songScores = mode.journalAnalysis.scoreSongs()
-            print("got song scores")
             mode.rankedSongs = mode.journalAnalysis.rankSongs(mode.songScores)
-            print("ranked songs")
             if (isinstance(mode.maxSongs, str) and mode.maxSongs != "" and mode.maxSongs.isdigit()):
                 mode.maxSongs = int(mode.maxSongs)
                 mode.rankedSongs = mode.journalAnalysis.eliminateNonMatches(mode.rankedSongs, maxSongs=mode.maxSongs)
@@ -487,9 +524,7 @@ class DailyPlaylistMode(JournalMode):
                 mode.rankedSongs = mode.journalAnalysis.eliminateNonMatches(mode.rankedSongs, maxSongs=mode.maxSongs)
             else:
                 mode.rankedSongs = mode.journalAnalysis.eliminateNonMatches(mode.rankedSongs)
-            print("eliminated non matches")
             mode.trackIDs = mode.userMusic.getPlaylistTrackIDs(mode.rankedSongs)
-            print("got track ids")
             if mode.descrip != "":
                 if mode.publicButton == True or mode.publicButton == False:
                     mode.userMusic.createPlaylist(mode.trackIDs, JournalMode.monthName, day=JournalMode.clickedDate, publicP= mode.publicButton, descrip=mode.descrip)
@@ -502,6 +537,7 @@ class DailyPlaylistMode(JournalMode):
                 mode.keywords = (", ").join(mode.keywords)
                 if mode.publicButton == True or mode.publicButton == False:
                     mode.userMusic.createPlaylist(mode.trackIDs, JournalMode.monthName, day=JournalMode.clickedDate, publicP= mode.publicButton, descrip=f"keywords: {mode.keywords}")
+                JournalMode.monthlyPlaylist = False
                 mode.playPlaylist = mode.getUserInput('Playlist created! If you would like to play the songs now, type "yes" or click "Cancel" if not.')
                 if mode.playPlaylist != None:
                     if mode.playPlaylist.lower() == 'yes':
@@ -509,10 +545,11 @@ class DailyPlaylistMode(JournalMode):
 
     def keyPressed(mode, event):
         if event.key == 'b':
+            JournalMode.monthlyPlaylist = False
             mode.publicButton = None
             mode.maxSongs = ""
             mode.descrip = ""
-            mode.app.setActiveMode(mode.app.entryMode)
+            mode.app.setActiveMode(mode.app.calendarMode)
 
 class HelpMode(Mode):
     def redrawAll(mode, canvas):
@@ -530,7 +567,7 @@ class MyModalApp(ModalApp):
         app.calendarMode = CalendarMode()
         app.helpMode = HelpMode()
         app.entryMode = EntryMode()
-        app.dailyPlaylistMode = DailyPlaylistMode()
+        app.playlistMode = PlaylistMode()
         app.setActiveMode(app.homeMode)
 
 if not os.path.exists(usernamePath):

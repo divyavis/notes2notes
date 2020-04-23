@@ -1,5 +1,3 @@
-import module_manager
-module_manager.review()
 import os
 import spotipy
 import spotipy.util as util
@@ -12,6 +10,7 @@ class MusicSetup(object):
         self.spotifyUsername = username
         self.getSpotifyAuth()
         self.songs = set()
+        self.publicPlaylist = True
 
     #modified from https://spotipy.readthedocs.io/en/2.9.0/#module-spotipy.client
     def getSpotifyAuth(self):
@@ -45,7 +44,7 @@ class MusicSetup(object):
 
     def formatTitle(self, title):
         title = title.lower()
-        eliminations = [' (feat. ', ' [feat. ', ' (with ', ' - from ', ' (from ', ' - remastered', ' - radio edit', ' - bonus track', ' - edit', ' - single version', ' - radio version', ' - full length version', ' - live']
+        eliminations = [' (feat. ', ' [feat. ', ' (with ', ' - from ', ' (from ', ' - remastered', ' - radio edit', ' - bonus track', ' (bonus track)', ' - edit', ' - single version', ' - radio version', ' - full length version', ' - live']
         updatedName = ""
         for word in eliminations:
             if word in title:
@@ -61,7 +60,7 @@ class MusicSetup(object):
             track = item['track']
             if self.isVocalTrack(track['id']):
                 trackList = []
-                trackList.append(track['name'])
+                trackList.append(track['name'].lower())
                 trackList.append(track['uri'])
                 for i in range(len(track['artists'])):
                     trackList.append((track['artists'][i]['name']).lower())
@@ -100,6 +99,7 @@ class MusicSetup(object):
                 title = self.formatTitle(title)
                 title = self.formatLink(title)
                 artist = song[2]
+                artist = self.formatLink(artist)
                 URL = f"https://genius.com/{artist}-{title}-lyrics"
                 page = requests.get(URL)
                 if page.status_code == 404:
@@ -134,6 +134,17 @@ class MusicSetup(object):
                     page = requests.get(URL)
                     if page.status_code == 404:
                         return None
+            else:
+                return None
+        else:
+            title = self.formatTitle(title)
+            title = self.formatLink(title)
+            artist = song[2]
+            artist = self.formatLink(artist)
+            URL = f"https://genius.com/{artist}-{title}-lyrics"
+            page = requests.get(URL)
+            if page.status_code == 404:
+                return None
         soup = BeautifulSoup(page.content, 'html.parser')
         for div in soup.findAll('div', attrs = {'class': 'lyrics'}):
             lyricList = div.text.strip().split("\n")
@@ -150,16 +161,12 @@ class MusicSetup(object):
                 return True
         return False
 
-    def createPlaylist(self, trackIDs, month, day=None, descrip=None, publicPlaylist=True):
-        if descrip != None:
-            playlistDescrip = f"keywords: {descrip}"
-        else:
-            playlistDescrip = descrip
+    def createPlaylist(self, trackIDs, month, day=None, publicP=True, descrip=None):
         if day != None:
             playlistName = f"{month} {day} playlist"
         else:
             playlistName = f"{month} playlist"
-        self.sp.user_playlist_create(self.spotifyUsername, name=playlistName, public=publicPlaylist, description=playlistDescrip)
+        self.sp.user_playlist_create(self.spotifyUsername, name=playlistName, public=publicP, description=descrip)
         for item in self.sp.user_playlists(self.spotifyUsername)['items']:
             if item['name'] == playlistName:
                 playlistID = item['id']
@@ -192,11 +199,9 @@ class MusicSetup(object):
         lyricDict = dict()
         others = []
         for song in songList:
-            title = song[0]
-            artist = song[2]
-            lyrics = self.getLyricsV2(title, artist)
+            lyrics = self.getLyricsV2(song)
             if lyrics != None:
-                lyricDict[(title, song[1])] = lyrics
+                lyricDict[(song[0], song[1])] = lyrics
         return lyricDict
 
     def getPlaylistTrackIDs(self, songList):
@@ -205,9 +210,3 @@ class MusicSetup(object):
             url = song[1]
             trackIDs.append(url)
         return trackIDs
-
-#def runSpotify():
-    #divMusic = MusicSetup("divviswa")
-    #return divMusic
-
-#runSpotify()

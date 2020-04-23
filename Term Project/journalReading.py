@@ -11,14 +11,15 @@ class JournalSetup(object):
         self.relevantWords = []
         self.songScores = []
     
+    #modified from https://www.cs.cmu.edu/~112/notes/notes-strings.html#basicFileIO
     def readSingleEntry(self, path):
         try:
             with open(path, "rt") as f:
                 self.journal = f.read()
                 if len(self.journal) < 10:
-                    return None
+                    self.journal = ""
         except:
-            return None
+            self.journal = ""
 
     def getRelevantWords(self):
         self.journal = self.journal.lower()
@@ -27,8 +28,9 @@ class JournalSetup(object):
             for letter in word:
                 if letter.isalnum():
                     cleanWord += letter
-            if cleanWord not in self.nonwords and len(cleanWord) >= 3:
+            if cleanWord not in self.nonwords and len(cleanWord) >= 3 and cleanWord not in self.relevantWords:
                 self.relevantWords.append(cleanWord)
+        return self.relevantWords
 
     def countWordOccurrencesInSong(self, lyricsDict):
         self.wordCountsDict = dict()
@@ -63,7 +65,8 @@ class JournalSetup(object):
             for word in wordCounts:
                 totalScore += wordCounts[word]
             self.songScores.append((title, url, totalScore))
-
+        return self.songScores
+        
     #modified from https://www.cs.cmu.edu/~112/notes/notes-recursion-part1.html#mergesort
     def merge(self, A, B):
         C = [ ]
@@ -78,18 +81,22 @@ class JournalSetup(object):
         return C
 
     #uses common mergeSort function
-    def rankSongs(self):
-        if len(self.songScores) < 2:
-            return self.songScores
+    def rankSongs(self, songScores):
+        if len(songScores) < 2:
+            return songScores
         else:
-            mid = len(self.songScores)//2
-            left = rankSongs(self.songScores[:mid])
-            right = rankSongs(self.songScores[mid:])
+            mid = len(songScores)//2
+            left = self.rankSongs(songScores[:mid])
+            right = self.rankSongs(songScores[mid:])
             return self.merge(left, right)
 
-    def eliminateNonMatches(self, rankedSongs):
+    def eliminateNonMatches(self, rankedSongs, maxSongs=None):
         updatedSongs = []
         for song in rankedSongs:
-            if song[2] > 0:
-                updatedSongs.append(song)
+            if maxSongs == None:
+                if song[2] > 0:
+                    updatedSongs.append(song)
+            else:
+                if song[2] > 0 and len(updatedSongs) < maxSongs:
+                    updatedSongs.append(song)
         return updatedSongs

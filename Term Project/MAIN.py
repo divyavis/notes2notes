@@ -1,3 +1,5 @@
+import module_manager
+module_manager.review()
 from cmu_112_graphics import *
 from tkinter import *
 import random
@@ -6,32 +8,74 @@ import os
 from musicSetup import *
 from journalReading import *
 
+#one global variable used is usernamePath to make sure Spotify is authenticated properly everytime app is opened
+usernamePath = f"{os.getcwd()}/spotifyUsername.txt"
+
+#from https://www.cs.cmu.edu/~112/notes/notes-strings.html#basicFileIO
+def writeFile(path, contents):
+    with open(path, "wt") as f:
+        f.write(contents)
+
+#modified from https://www.cs.cmu.edu/~112/notes/notes-strings.html#basicFileIO
+def readFile(path):
+    with open(path, "rt") as f:
+        return f.read()
+
+#from https://www.cs.cmu.edu/~112/notes/notes-graphics.html#customColors
+def rgbString(red, green, blue):
+    return "#%02x%02x%02x" % (red, green, blue)
+
+def authUser():
+    username = input("Enter your Spotify username and click 'Enter' when done: ")
+    print("\n")
+    confirmation = input(f"You typed '{username}'. Make sure it is the exact same username associated with your Spotify account. Is '{username}' correct? Type 'yes' or 'no' and click 'Enter' when done: ")
+    if confirmation.lower() == 'yes':
+        userMusic = MusicSetup(username)
+        writeFile(usernamePath, username)
+    elif confirmation.lower() == 'no':
+        print("Please try again.")
+        print("\n")
+        authUser()
+    else:
+        print("Please type 'yes' or 'no' and try authenticating again.")
+        print("\n")
+        authUser()
+
 class HomeMode(Mode):
     def appStarted(mode):
         mode.buttonHeight = mode.height//20
-        mode.path = f"{os.getcwd()}/spotifyUsername.txt"
+        #mode.path = f"{os.getcwd()}/spotifyUsername.txt"
+        #from https://images.unsplash.com/photo-1494232410401-ad00d5433cfa?ixlib=rb-1.2.1&q=80&fm=jpg&crop=entropy&cs=tinysrgb
+        mode.image1 = mode.loadImage('cassetteTape.jpeg')
+        mode.image2 = mode.scaleImage(mode.image1, 1/3)
+        mode.manila = rgbString(250, 240, 190)
+        mode.darkGray = rgbString(40, 40, 40)
+        mode.seafoamGreen = rgbString(160, 214, 181)
 
-    #from https://www.cs.cmu.edu/~112/notes/notes-strings.html#basicFileIO
-    def writeFile(mode, path, contents):
-        with open(path, "wt") as f:
-            f.write(contents)
-    
-    #modified from https://www.cs.cmu.edu/~112/notes/notes-strings.html#basicFileIO
-    def readFile(mode, path):
-        with open(path, "rt") as f:
-            return f.read()
+    def drawQuarterNote(mode, canvas):
+        canvas.create_oval((mode.width//2)-(mode.width//36), (18*mode.height)//20, (mode.width//2)+(mode.width//36), (19*mode.height)//20, fill=mode.seafoamGreen, outline=mode.seafoamGreen)
+        canvas.create_rectangle((mode.width//2-mode.width//12) + ((2*mode.width)//20), (16*mode.height)//20, (mode.width//2-mode.width//12)+((2*mode.width)//18), (23*mode.height)//25, outline=mode.seafoamGreen, fill=mode.seafoamGreen)   
 
     def redrawAll(mode, canvas):
-        font = f'Helvetica {mode.buttonHeight//2} bold'
-        canvas.create_text(mode.width//2, mode.height//4, text='Welcome to Notes2Notes', font=font)
-        canvas.create_text(mode.width//2, mode.height//3, text='Click "h" for instructions on how to use your journal', font=font)
-        canvas.create_rectangle(mode.width//3, ((mode.height//2)-(mode.buttonHeight//2)), (2*mode.width)//3, ((mode.height//2)+(mode.buttonHeight//2)), fill="green")
-        canvas.create_text(mode.width//2, mode.height//2, text='See your journal', font=font)
-        canvas.create_rectangle(mode.width//3, ((mode.height//2+(2*mode.buttonHeight))-(mode.buttonHeight//2)), (2*mode.width)//3, ((mode.height//2+(2*mode.buttonHeight))+(mode.buttonHeight//2)), fill="green")
-        if not os.path.exists(mode.path):
-            canvas.create_text(mode.width//2, (mode.height//2)+(2*mode.buttonHeight), text='Connect Spotify', font=font)
+        font = f'ComicSansMS {mode.buttonHeight//2} bold'
+        canvas.create_rectangle(0, 0, mode.width, mode.height, fill=mode.manila)
+        #canvas.create_image(200, 300, image=ImageTk.PhotoImage(mode.image1))
+        canvas.create_image(mode.width//2, mode.height//4, image=ImageTk.PhotoImage(mode.image2))
+        #canvas.create_text(mode.width//2, mode.height//4, text='Welcome to Notes2Notes', font=font)
+        canvas.create_text(mode.width//2, (mode.height//2)+(4*mode.buttonHeight), text='Click "h" for instructions on how to use your journal', font=font, fill=mode.darkGray)
+        canvas.create_rectangle(mode.width//3, ((mode.height//2)-(mode.buttonHeight//2)), (2*mode.width)//3, ((mode.height//2)+(mode.buttonHeight//2)), fill=mode.darkGray)
+        canvas.create_text(mode.width//2, mode.height//2, text='See your journal', font=font, fill=mode.manila)
+        if not os.path.exists(usernamePath):
+            rectFill = mode.darkGray
+            textFill = mode.manila
+            canvas.create_rectangle(mode.width//3, ((mode.height//2+(2*mode.buttonHeight))-(mode.buttonHeight//2)), (2*mode.width)//3, ((mode.height//2+(2*mode.buttonHeight))+(mode.buttonHeight//2)), fill=rectFill, outline=rectFill)
+            canvas.create_text(mode.width//2, (mode.height//2)+(2*mode.buttonHeight), text='Connect Spotify', font=font, fill=textFill)
         else:
-            canvas.create_text(mode.width//2, (mode.height//2)+(2*mode.buttonHeight), text='Spotify Connected!', font=font)
+            rectFill = mode.seafoamGreen
+            textFill = mode.darkGray
+            canvas.create_rectangle(mode.width//3, ((mode.height//2+(2*mode.buttonHeight))-(mode.buttonHeight//2)), (2*mode.width)//3, ((mode.height//2+(2*mode.buttonHeight))+(mode.buttonHeight//2)), fill=rectFill, outline=rectFill)
+            canvas.create_text(mode.width//2, (mode.height//2)+(2*mode.buttonHeight), text='Spotify Connected!', font=font, fill=textFill)
+        mode.drawQuarterNote(canvas)
 
     def keyPressed(mode, event):
         if event.key == 'h':
@@ -39,24 +83,22 @@ class HomeMode(Mode):
     
     def mousePressed(mode, event):
         if (event.x >= mode.width//3 and event.x <= (2*mode.width)//3) and (event.y >= (mode.height//2)-(mode.buttonHeight//2) and event.y <= (mode.height//2)+(mode.buttonHeight//2)):
-            if os.path.exists(mode.path):
-                username = mode.readFile
-                userMusic = MusicSetup(username)
             mode.app.setActiveMode(mode.app.calendarMode)
         if (event.x >= mode.width//3 and event.x <= (2*mode.width)//3) and (event.y >= (mode.height//2+(2*mode.buttonHeight))-(mode.buttonHeight//2) and event.y <= (mode.height//2+(2*mode.buttonHeight))+(mode.buttonHeight//2)):
-            if not os.path.exists(mode.path):
-                print("hi")
-                mode.checkAuth()
+            pass
+            #if not os.path.exists(usernamePath):
+                #mode.checkAuth()
     
     def checkAuth(mode):
         username = mode.getUserInput("Enter your Spotify username")
-        mode.userMusic = MusicSetup(username)
-        if mode.userMusic.gotAuth:
-            mode.writeFile(mode.path, username)
-            return None
-        else:
-            mode.showMessage('Authentication failed. Please try again.')
-            mode.checkAuth()
+        if username != None:
+            mode.userMusic = MusicSetup(username)
+            if mode.userMusic.gotAuth:
+                mode.writeFile(mode.path, username)
+                return None
+            else:
+                mode.showMessage('Authentication failed. Please try again.')
+                mode.checkAuth()
 
 class JournalMode(Mode):
     selection = (-1, -1)
@@ -82,6 +124,9 @@ class CalendarMode(JournalMode):
     def appStarted(mode):
         mode.margin = mode.height//8
         mode.cols = 7
+        mode.manila = rgbString(250, 240, 190)
+        mode.seafoamGreen = rgbString(160, 214, 181)
+        mode.darkGray = rgbString(40, 40, 40)
           
     #modified from http://www.cs.cmu.edu/~112/notes/notes-animations-part1.html#exampleGrids
     def pointInGrid(mode, x, y):
@@ -165,25 +210,25 @@ class CalendarMode(JournalMode):
         for row in range(JournalMode.rows):
             for col in range(mode.cols):
                 (x0, y0, x1, y1) = mode.getCellBounds(row, col)
-                canvas.create_rectangle(x0, y0, x1, y1, fill='cyan')
+                canvas.create_rectangle(x0, y0, x1, y1, fill=mode.manila)
         mode.drawDates(canvas)
-        canvas.create_text(mode.width//2, (mode.height-(mode.margin//2)), text='Click "b" to go back to home screen', font=f'Helvetica {mode.margin//4} bold')
+        canvas.create_text(mode.width//2, (mode.height-(mode.margin//2)), text='Click "b" to go back to home screen', font=f'ComicSansMS {mode.margin//4} bold')
         mode.prevMonthButton(canvas)
 
     def prevMonthButton(mode, canvas):
-        canvas.create_rectangle((2*mode.margin)//3, (mode.margin + mode.gridHeight + (mode.margin//4)), (4*mode.margin)//3, (mode.margin + mode.gridHeight + (3*(mode.margin//4))), fill="green")
-        canvas.create_text(mode.margin, (mode.margin + mode.gridHeight + (mode.margin//2)), text="<--", font=f'Helvetica {mode.margin//3} bold')
+        canvas.create_rectangle((2*mode.margin)//3, (mode.margin + mode.gridHeight + (mode.margin//4)), (4*mode.margin)//3, (mode.margin + mode.gridHeight + (3*(mode.margin//4))), fill=mode.seafoamGreen)
+        canvas.create_text(mode.margin, (mode.margin + mode.gridHeight + (mode.margin//2)), text="<--", font=f'ComicSansMS {mode.margin//3} bold', fill=mode.darkGray)
     
     def nextMonthButton(mode, canvas):
-        canvas.create_rectangle((mode.width-((4*mode.margin)//3)), (mode.margin + mode.gridHeight + (mode.margin//4)), (mode.width - ((2*mode.margin)//3)), (mode.margin + mode.gridHeight + (3*(mode.margin//4))), fill="green")
-        canvas.create_text(mode.margin+mode.gridWidth, (mode.margin + mode.gridHeight + (mode.margin//2)), text="-->", font=f'Helvetica {mode.margin//3} bold')
+        canvas.create_rectangle((mode.width-((4*mode.margin)//3)), (mode.margin + mode.gridHeight + (mode.margin//4)), (mode.width - ((2*mode.margin)//3)), (mode.margin + mode.gridHeight + (3*(mode.margin//4))), fill=mode.seafoamGreen)
+        canvas.create_text(mode.margin+mode.gridWidth, (mode.margin + mode.gridHeight + (mode.margin//2)), text="-->", font=f'ComicSansMS {mode.margin//3} bold', fill=mode.darkGray)
 
     def keyPressed(mode, event):
         if event.key == 'b':
             mode.app.setActiveMode(mode.app.homeMode)
 
     def drawDayText(mode, canvas, col, x0, x1):
-        font = f'Helvetica {mode.margin//8}'
+        font = f'ComicSansMS {mode.margin//8}'
         xDay = (x0 + x1)/2
         yDay = mode.margin - 10
         if col == 0:
@@ -202,7 +247,7 @@ class CalendarMode(JournalMode):
             canvas.create_text(xDay, yDay, text="Sunday", font=font)
     
     def drawHeader(mode, canvas):
-        font = f'Helvetica {mode.margin//4} bold'
+        font = f'ComicSansMS {mode.margin//4} bold'
         if JournalMode.monthInt == 1:
             JournalMode.monthName = "January"
         elif JournalMode.monthInt == 2:
@@ -230,7 +275,7 @@ class CalendarMode(JournalMode):
         canvas.create_text(mode.width//2, mode.margin//2, text=f"{JournalMode.monthName} {JournalMode.currYear}", font=font)
 
     def drawDates(mode, canvas):
-        font = f'Helvetica {mode.margin//8} bold'
+        font = f'ComicSansMS {mode.margin//8} bold'
         i = 1
         for row in range(JournalMode.rows):
             for col in range(mode.cols):
@@ -255,6 +300,9 @@ class EntryMode(JournalMode):
         mode.margin = mode.height//10
         mode.buttonHeight = mode.height//20
         mode.path = None
+        mode.manila = rgbString(250, 240, 190)
+        mode.seafoamGreen = rgbString(160, 214, 181)
+        mode.darkGray = rgbString(40, 40, 40)
 
     def mousePressed(mode, event):
         dirName = f"{os.getcwd()}/journalEntries"
@@ -297,18 +345,18 @@ class EntryMode(JournalMode):
         return journalEntry
 
     def redrawAll(mode, canvas):
-        font = f'Helvetica {mode.buttonHeight//2}'
-        canvas.create_text(mode.width//2, mode.margin//2, text=f"{JournalMode.monthName} {JournalMode.clickedDate}, {JournalMode.currYear}", font=f'Helvetica {mode.buttonHeight} bold')
-        canvas.create_rectangle(2*mode.margin, mode.margin, (mode.width//2)-mode.margin, (mode.margin + mode.buttonHeight), fill="green")
+        font = f'ComicSansMS {mode.buttonHeight//2}'
+        canvas.create_text(mode.width//2, mode.margin//2, text=f"{JournalMode.monthName} {JournalMode.clickedDate}, {JournalMode.currYear}", font=f'ComicSansMS {(2*mode.buttonHeight)//3} bold')
+        canvas.create_rectangle(2*mode.margin, mode.margin, (mode.width//2)-mode.margin, (mode.margin + mode.buttonHeight), fill=mode.seafoamGreen)
         textCenterX1 = 2*mode.margin + (((mode.width//2)-mode.margin) - (2*mode.margin))//2
-        canvas.create_text(textCenterX1, (mode.margin + mode.buttonHeight//2), text='Make/edit journal entry', font=f'Helvetica {mode.buttonHeight//3}')
+        canvas.create_text(textCenterX1, (mode.margin + mode.buttonHeight//2), text='Make/edit journal entry', font=f'ComicSansMS {mode.buttonHeight//3}')
         textCenterX2 = ((mode.width//2)+mode.margin) + ((mode.width-(2*mode.margin)) - ((mode.width//2)+mode.margin))//2
-        canvas.create_rectangle((mode.width//2)+mode.margin, mode.margin, mode.width-(2*mode.margin), (mode.margin + mode.buttonHeight), fill="green")
-        canvas.create_text(textCenterX2, (mode.margin + mode.buttonHeight//2), text='Create playlist', font=f'Helvetica {mode.buttonHeight//3}')
-        canvas.create_rectangle(mode.margin, (2*mode.margin), (mode.width-mode.margin), (mode.height-mode.margin))
+        canvas.create_rectangle((mode.width//2)+mode.margin, mode.margin, mode.width-(2*mode.margin), (mode.margin + mode.buttonHeight), fill=mode.seafoamGreen)
+        canvas.create_text(textCenterX2, (mode.margin + mode.buttonHeight//2), text='Create playlist', font=f'ComicSansMS {mode.buttonHeight//3}')
+        canvas.create_rectangle(mode.margin, (2*mode.margin), (mode.width-mode.margin), (mode.height-mode.margin), fill=mode.manila)
         if mode.formatTxt() != None:
-            canvas.create_text(mode.margin, (2*mode.margin), text=mode.formatTxt(), anchor= "nw", width=mode.width-(2*mode.margin))
-        canvas.create_text(mode.width//2, (mode.height-(mode.margin//2)), text='Click "b" to go back to calendar screen. Only create a playlist when journal entry is fully complete!', font=f'Helvetica {mode.margin//5} bold')
+            canvas.create_text(mode.margin+5, (2*mode.margin)+5, text=mode.formatTxt(), anchor= "nw", width=mode.width-((2*mode.margin)-10), font="Helvetica 15")
+        canvas.create_text(mode.width//2, (mode.height-(mode.margin//2)), text='Click "b" to go back to calendar screen. Only create a playlist when journal entry is fully complete!', font=f'ComicSansMS {mode.margin//5}')
 
     #modified from https://stackoverflow.com/questions/14824163/how-to-get-the-input-from-the-tkinter-text-widget
     def save(mode):
@@ -332,22 +380,88 @@ class EntryMode(JournalMode):
     def end(mode):
         mode.root.destroy()
 
-class PlaylistMode(Mode):
+class PlaylistMode(JournalMode):
     def appStarted(mode):
-        pass
+        mode.margin = mode.height//10
+        mode.manila = rgbString(250, 240, 190)
+        mode.seafoamGreen = rgbString(160, 214, 181)
+        mode.publicButton = None
+        mode.buttonHeight = mode.height//20
+        mode.buttonWidth = mode.width//5
+        mode.darkGray = rgbString(40, 40, 40)
+        if os.path.exists(usernamePath):
+            username = readFile(usernamePath)
+            userMusic = MusicSetup(username)
+        else:
+            mode.showMessage('Please go back to the home screen and connect your Spotify.')
+        mode.maxSongs = ""
+        mode.descrip = ""
 
+    def drawHeader(mode, canvas):
+        font = f'ComicSansMS {mode.margin//2} bold'
+        canvas.create_text(mode.width//2, mode.margin, text="Playlist Preferences", font=font)
+
+    def drawPublicButton(mode, buttonFill, canvas):
+        canvas.create_rectangle(mode.width//2 - mode.buttonHeight - mode.buttonWidth, 2*mode.margin + mode.buttonHeight, (mode.width//2 - mode.buttonHeight), (2*mode.margin + 2*mode.buttonHeight), fill=buttonFill, outline=mode.darkGray)
+        textCenterX = ((mode.width//2 - mode.buttonHeight)-mode.buttonWidth) + mode.buttonWidth//2
+        canvas.create_text(textCenterX, ((2*mode.margin + mode.buttonHeight) + mode.buttonHeight//2), text="Public", font=f'ComicSansMS {mode.margin//4}')
+
+    def drawPrivateButton(mode, buttonFill, canvas):
+        canvas.create_rectangle(mode.width//2 + mode.buttonHeight, 2*mode.margin + mode.buttonHeight, mode.width//2 + mode.buttonHeight + mode.buttonWidth, (2*mode.margin + 2*mode.buttonHeight), fill=buttonFill, outline=mode.darkGray)
+        textCenterX = ((mode.width//2 + mode.buttonHeight)+mode.buttonWidth) - mode.buttonWidth//2
+        canvas.create_text(textCenterX, ((2*mode.margin + mode.buttonHeight) + mode.buttonHeight//2), text="Private", font=f'ComicSansMS {mode.margin//4}')
+        
     def redrawAll(mode, canvas):
-        font = 'Helvetica 26 bold'
-        canvas.create_text(mode.width/2, 250, text='this is where users enter preferences to make playlist', font=font)
-        canvas.create_text(mode.width/2, 350, text='Press "b" to go back to the entry screen!', font=font)
+        mode.drawHeader(canvas)
+        canvas.create_text(mode.width//2, 2*mode.margin, text="Playlist type:", font=f'ComicSansMS {mode.margin//3} bold')
+        mode.drawPublicButton(mode.manila, canvas)
+        mode.drawPrivateButton(mode.manila, canvas)
+        if mode.publicButton == True:
+            mode.drawPublicButton(mode.seafoamGreen, canvas)
+        elif mode.publicButton == False:
+            mode.drawPrivateButton(mode.seafoamGreen, canvas)
+        canvas.create_text(mode.width//2, 4*mode.margin, text="Max number of songs in playlist (skip if no preference):", font=f'ComicSansMS {mode.margin//3} bold')
+        canvas.create_rectangle(mode.width//3, 4*mode.margin+mode.buttonHeight, (2*mode.width)//3, 4*mode.margin+(2*mode.buttonHeight), fill=mode.manila)
+        if mode.maxSongs != None and mode.maxSongs.isdigit():
+            maxSongText = f"Max songs: {mode.maxSongs}"
+            canvas.create_text(mode.width//2, (4*mode.margin+mode.buttonHeight)+mode.buttonHeight//2, text=maxSongText, font=f'ComicSansMS {mode.margin//4}')
+        else:
+            maxSongText = "Click here to enter"
+            canvas.create_text(mode.width//2, (4*mode.margin+mode.buttonHeight)+mode.buttonHeight//2, text=maxSongText, font=f'ComicSansMS {mode.margin//4}')
+            mode.maxSongs = ""
+        canvas.create_text(mode.width//2, 6*mode.margin, text="Custom description (skip if no preference):", font=f'ComicSansMS {mode.margin//3} bold')
+        canvas.create_rectangle(mode.margin, 6*mode.margin+mode.buttonHeight, mode.width-mode.margin, 6*mode.margin+(3*mode.buttonHeight), fill=mode.manila)
+        if mode.descrip != None and mode.descrip != "":
+            descripText = mode.descrip
+            canvas.create_text(mode.margin+5, (6*mode.margin+mode.buttonHeight)+5, width=mode.width-mode.margin-10, anchor="nw", text=descripText, font=f'Helvetica 15')
+        else:
+            descripText = "Click here to enter custom description"
+            canvas.create_text(mode.width//2, 6*mode.margin+(2*mode.buttonHeight), text=descripText, font=f'ComicSansMS {mode.margin//4} bold')
+
+    def mousePressed(mode, event):
+        if (event.x >= mode.width//2 - mode.buttonHeight - mode.buttonWidth and event.x <= (mode.width//2 - mode.buttonHeight)) and (event.y >= 2*mode.margin + mode.buttonHeight and event.y <= (2*mode.margin + 2*mode.buttonHeight)):
+            mode.publicButton = True
+        if (event.x >= mode.width//2 + mode.buttonHeight and event.x <= mode.width//2 + mode.buttonHeight + mode.buttonWidth) and (event.y >= 2*mode.margin + mode.buttonHeight and event.y <= (2*mode.margin + 2*mode.buttonHeight)):
+            mode.publicButton = False
+        if (event.x >= mode.width//3 and event.x <= (2*mode.width)//3) and (event.y >= 4*mode.margin+mode.buttonHeight and event.y <= 4*mode.margin+(2*mode.buttonHeight)):
+            mode.maxSongs = mode.getUserInput("Enter the max number of songs you want in your playlist (as digits)")
+            if mode.maxSongs == None:
+                mode.maxSongs = ""
+        if (event.x >= mode.margin and event.x <= mode.width-mode.margin) and (event.y >= 6*mode.margin+mode.buttonHeight and event.y <= 6*mode.margin+(3*mode.buttonHeight)):
+            mode.descrip = mode.getUserInput("Enter your custom description for your playlist")
+            if mode.descrip == None:
+                mode.descrip = ""
 
     def keyPressed(mode, event):
         if event.key == 'b':
+            mode.publicButton = None
+            mode.maxSongs = ""
+            mode.descrip = ""
             mode.app.setActiveMode(mode.app.entryMode)
 
 class HelpMode(Mode):
     def redrawAll(mode, canvas):
-        font = 'Helvetica 26 bold'
+        font = 'ComicSansMS 26 bold'
         canvas.create_text(mode.width/2, 250, text='(Insert helpful message here)', font=font)
         canvas.create_text(mode.width/2, 350, text='Press "b" to go back to the home screen!', font=font)
 
@@ -363,5 +477,8 @@ class MyModalApp(ModalApp):
         app.entryMode = EntryMode()
         app.playlistMode = PlaylistMode()
         app.setActiveMode(app.homeMode)
+
+if not os.path.exists(usernamePath):
+    authUser()
 
 app = MyModalApp(width=800, height=800)

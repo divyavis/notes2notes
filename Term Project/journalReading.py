@@ -1,6 +1,6 @@
 class JournalSetup(object):
     def __init__(self):
-        self.journal = ""
+        #self.journal = ""
         #list from https://www.english-grammar-revolution.com/list-of-conjunctions.html
         self.coordinatingConjunctions = ['for', 'and','nor', 'but', 'or', 'yet', 'so']
         self.subordinatingConjunctions = ['after', 'although', 'because', 'before', 'lest', 'once', 'only', 'since', 'than', 'that', 'though', 'till', 'unless', 'until', 'when', 'whenever', 'where', 'wherever', 'while']
@@ -13,17 +13,20 @@ class JournalSetup(object):
     
     #modified from https://www.cs.cmu.edu/~112/notes/notes-strings.html#basicFileIO
     def readSingleEntry(self, path):
+        journal = ""
         try:
             with open(path, "rt") as f:
-                self.journal = f.read()
-                if len(self.journal) < 10:
-                    self.journal = ""
+                journal = f.read()
+                if len(journal) < 10:
+                    return ""
+                else:
+                    return journal
         except:
-            self.journal = ""
+            return ""
 
-    def getRelevantWords(self):
-        self.journal = self.journal.lower()
-        for word in self.journal.split():
+    def getRelevantWords(self, journal):
+        journal = journal.lower()
+        for word in journal.split():
             cleanWord = ""
             for letter in word:
                 if letter.isalnum():

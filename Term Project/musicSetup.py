@@ -11,11 +11,10 @@ class MusicSetup(object):
         self.getSpotifyAuth()
         self.songs = set()
         self.publicPlaylist = True
+        self.flash = False
 
     #modified from https://spotipy.readthedocs.io/en/2.9.0/#module-spotipy.client
     def getSpotifyAuth(self):
-        #if os.path.exists(f".cache-{self.spotifyUsername}"):
-            #os.remove(f".cache-{self.spotifyUsername}")
         scope = "user-library-read, playlist-modify-public, playlist-modify-private, user-read-playback-state, streaming"
         clientId = "7b770ecc73434facafdfe5dccace0566"
         clientSecret = "347dff87da6c45ca95cdc71f6c935ceb"
@@ -44,7 +43,7 @@ class MusicSetup(object):
 
     def formatTitle(self, title):
         title = title.lower()
-        eliminations = [' (feat. ', ' [feat. ', ' (with ', ' - from ', ' (from ', ' - remastered', ' - radio edit', ' - bonus track', ' (bonus track)', ' - edit', ' - single version', ' - radio version', ' - full length version', ' - live']
+        eliminations = [' (feat. ', ' [feat. ', ' feat. ', ' (with ', ' - from ', ' (from ', ' - remastered', ' - radio edit', ' - bonus track', ' (bonus track)', ' - edit', ' - single version', ' - radio version', ' - full length version', ' - live']
         updatedName = ""
         for word in eliminations:
             if word in title:
@@ -95,7 +94,7 @@ class MusicSetup(object):
     def getLyricsV2(self, song):
         title = song[0]
         if len(song) > 3:
-            if ' (feat. ' in title or ' [feat. ' in title or len(song) > 5:
+            if ' (feat. ' in title or ' [feat. ' in title or ' feat. ' in title or len(song) > 5:
                 title = self.formatTitle(title)
                 title = self.formatLink(title)
                 artist = song[2]
@@ -166,11 +165,13 @@ class MusicSetup(object):
             playlistName = f"{month} {day} playlist"
         else:
             playlistName = f"{month} playlist"
-        self.sp.user_playlist_create(self.spotifyUsername, name=playlistName, public=publicP, description=descrip)
+        self.sp.user_playlist_create(self.spotifyUsername, name=playlistName, public=True, description=descrip)
         for item in self.sp.user_playlists(self.spotifyUsername)['items']:
             if item['name'] == playlistName:
                 playlistID = item['id']
                 self.sp.user_playlist_add_tracks(self.spotifyUsername, playlist_id=playlistID, tracks=trackIDs)
+        if publicP == False:
+            self.sp.user_playlist_change_details(self.spotifyUsername, playlistID, public=False)
 
     def getDeviceID(self):
         deviceInfo = self.sp.devices()['devices']

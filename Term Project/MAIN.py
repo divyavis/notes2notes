@@ -8,12 +8,17 @@ import os
 from musicSetup import *
 from journalReading import *
 
-#add reset user button
-#make sure create playlist isn't clickable if no entry is in
-#logout button
+#add reset user button (DONE)
+#make sure create playlist isn't clickable if no entry is in (DONE)
+#logout button (DONE)
 #get out button after playing songs (DONE)
 #loading screen (DONE)
+#add note saying if u want create another playlist run app again
+#see if i can restart app if u want to make a new playlist
 #indicate on calendar screen when someone has made an entry
+#decorate auth website
+#add instructions to help mode
+#mode.showMessage not working??
 #google calendar syncing?
 #public spotify playlists
 #nlp
@@ -80,12 +85,12 @@ class HomeMode(Mode):
             rectFill = mode.darkGray
             textFill = mode.manila
             canvas.create_rectangle(mode.width//3, ((mode.height//2+(2*mode.buttonHeight))-(mode.buttonHeight//2)), (2*mode.width)//3, ((mode.height//2+(2*mode.buttonHeight))+(mode.buttonHeight//2)), fill=rectFill, outline=rectFill)
-            canvas.create_text(mode.width//2, (mode.height//2)+(2*mode.buttonHeight), text='Connect Spotify', font=font, fill=textFill)
+            canvas.create_text(mode.width//2, (mode.height//2)+(2*mode.buttonHeight), text='Run app again to login to Spotify', font=f'ComicSansMS {mode.buttonHeight//3} bold', fill=textFill)
         else:
             rectFill = mode.seafoamGreen
             textFill = mode.darkGray
             canvas.create_rectangle(mode.width//3, ((mode.height//2+(2*mode.buttonHeight))-(mode.buttonHeight//2)), (2*mode.width)//3, ((mode.height//2+(2*mode.buttonHeight))+(mode.buttonHeight//2)), fill=rectFill, outline=rectFill)
-            canvas.create_text(mode.width//2, (mode.height//2)+(2*mode.buttonHeight), text='Spotify Connected!', font=font, fill=textFill)
+            canvas.create_text(mode.width//2, (mode.height//2)+(2*mode.buttonHeight), text='Log out of Spotify', font=font, fill=textFill)
         mode.drawQuarterNote(canvas)
 
     def keyPressed(mode, event):
@@ -96,9 +101,12 @@ class HomeMode(Mode):
         if (event.x >= mode.width//3 and event.x <= (2*mode.width)//3) and (event.y >= (mode.height//2)-(mode.buttonHeight//2) and event.y <= (mode.height//2)+(mode.buttonHeight//2)):
             mode.app.setActiveMode(mode.app.calendarMode)
         if (event.x >= mode.width//3 and event.x <= (2*mode.width)//3) and (event.y >= (mode.height//2+(2*mode.buttonHeight))-(mode.buttonHeight//2) and event.y <= (mode.height//2+(2*mode.buttonHeight))+(mode.buttonHeight//2)):
-            pass
-            #if not os.path.exists(usernamePath):
-                #mode.checkAuth()
+            if os.path.exists(usernamePath):
+                username = readFile(usernamePath)
+                os.remove(f".cache-{username}")
+                os.remove(usernamePath)
+            else:
+                pass
     
     def checkAuth(mode):
         username = mode.getUserInput("Enter your Spotify username")
@@ -131,7 +139,6 @@ class JournalMode(Mode):
     rows = ((dateStartCol + lastDate)//7) + 1
     dateLocSet = set()
     monthlyPlaylist = False
-    
 
 class CalendarMode(JournalMode):
     def appStarted(mode):
@@ -508,7 +515,6 @@ class PlaylistMode(JournalMode):
             if PlaylistMode.descrip == None:
                 PlaylistMode.descrip = ""
         if (event.x >= mode.width//3 and event.x <= (2*mode.width)//3) and (event.y >= (8*mode.margin+mode.buttonHeight//2) and event.y <= 8*mode.margin+(2*mode.buttonHeight)):
-            print("create playlist button worked")
             mode.app.setActiveMode(mode.app.loadingMode)
 
     def keyPressed(mode, event):
@@ -536,7 +542,7 @@ class LoadingMode(PlaylistMode):
         imageChoice = random.choice(dirList)
         mode.image1 = mode.loadImage(f"{os.getcwd()}/dogImages/{imageChoice}")
         mode.image2 = mode.scaleImage(mode.image1, 2/3)
-        #mode.timerDelay = 100
+        mode.timerDelay = 100
     
     def timerFired(mode):
         if mode.done == False and mode.drawn == True:

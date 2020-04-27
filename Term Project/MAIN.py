@@ -13,6 +13,7 @@ from journalReading import *
 #logout button (DONE)
 #get out button after playing songs (DONE)
 #loading screen (DONE)
+#collaborative journal --> collaborative playlist
 #add note saying if u want create another playlist run app again
 #see if i can restart app if u want to make a new playlist
 #indicate on calendar screen when someone has made an entry
@@ -20,10 +21,10 @@ from journalReading import *
 #add instructions to help mode
 #mode.showMessage not working??
 #google calendar syncing?
-#public spotify playlists
+#public spotify playlists (DONE)
 #nlp
-#query by spotify username
-#get public spotify playlists of followers
+#query by spotify username (DONE)
+#get public spotify playlists of followers (DONE)
 #other knob direction
 
 #one global variable used is usernamePath to make sure Spotify is authenticated properly everytime app is opened
@@ -495,7 +496,7 @@ class PlaylistMode(JournalMode):
         if PlaylistMode.myMusic == True and PlaylistMode.friendMusic == False and PlaylistMode.spotifyMusic == False:
             mode.myMusicButton(mode.seafoamGreen, canvas)
         elif PlaylistMode.myMusic == False and PlaylistMode.friendMusic == True and PlaylistMode.spotifyMusic == False:
-            friendUsername = f"Friend user: {PlaylistMode.friendUser}"
+            friendUsername = f'"{PlaylistMode.friendUser}"'
             mode.friendMusicButton(mode.seafoamGreen, friendUsername, canvas)
         elif PlaylistMode.myMusic == False and PlaylistMode.friendMusic == False and PlaylistMode.spotifyMusic == True:
             mode.spotifyMusicButton(mode.seafoamGreen, canvas)
@@ -535,7 +536,6 @@ class PlaylistMode(JournalMode):
             PlaylistMode.myMusic = True
             PlaylistMode.friendMusic = False
             PlaylistMode.spotifyMusic = False
-            print("myMusic")
         if (event.x >= mode.width//2 - mode.buttonWidth//2 and event.x <= mode.width//2 + mode.buttonWidth//2) and (event.y >= 2*mode.margin + mode.buttonHeight and event.y <= (2*mode.margin + 2*mode.buttonHeight)):
             PlaylistMode.friendUser = mode.getUserInput("Enter your friend's Spotify username and press 'ok' when done")
             if PlaylistMode.friendUser == None:
@@ -547,13 +547,10 @@ class PlaylistMode(JournalMode):
                 PlaylistMode.myMusic = False
                 PlaylistMode.friendMusic = True
                 PlaylistMode.spotifyMusic = False
-            print("friendMusic")
-            print(PlaylistMode.friendUser)
         if (event.x >= mode.width - mode.width//5 - mode.buttonWidth and event.x <= mode.width - mode.width//5) and (event.y >= 2*mode.margin + mode.buttonHeight and event.y <= (2*mode.margin + 2*mode.buttonHeight)):
             PlaylistMode.myMusic = False
             PlaylistMode.friendMusic = False
             PlaylistMode.spotifyMusic = True
-            print("spotifyMusic")
         if (event.x >= mode.width//2 - mode.buttonHeight - mode.buttonWidth and event.x <= (mode.width//2 - mode.buttonHeight)) and (event.y >= 4*mode.margin + mode.buttonHeight and event.y <= (4*mode.margin + 2*mode.buttonHeight)):
             PlaylistMode.publicButton = True
         if (event.x >= mode.width//2 + mode.buttonHeight and event.x <= mode.width//2 + mode.buttonHeight + mode.buttonWidth) and (event.y >= 4*mode.margin + mode.buttonHeight and event.y <= (4*mode.margin + 2*mode.buttonHeight)):
@@ -616,7 +613,12 @@ class LoadingMode(PlaylistMode):
                 relevantWords = journalAnalysis.getRelevantWords(PlaylistMode.dayJournal)
             username = readFile(usernamePath)
             userMusic = MusicSetup(username)
-            userMusic.makeUserSongSet()
+            if PlaylistMode.myMusic == True:
+                userMusic.makeUserSongSet()
+            elif PlaylistMode.friendMusic == True:
+                userMusic.makeFriendSongSet(PlaylistMode.friendUser)
+            elif PlaylistMode.spotifyMusic == True:
+                userMusic.makeFriendSongSet("spotify")
             songList = userMusic.getTitleMatchedSongs(relevantWords)
             lyricDict = userMusic.getSongLyrics(songList)
             wordCounts = journalAnalysis.countWordOccurrencesInSong(lyricDict)
@@ -652,6 +654,10 @@ class LoadingMode(PlaylistMode):
             PlaylistMode.publicButton = None
             PlaylistMode.monthJournal = ""
             PlaylistMode.dayJournal = ""
+            PlaylistMode.friendUser = ""
+            PlaylistMode.myMusic = None
+            PlaylistMode.friendMusic = None
+            PlaylistMode.spotifyMusic = None
     
     def keyPressed(mode, event):
         if event.key == 'b':

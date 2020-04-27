@@ -219,14 +219,15 @@ class CalendarMode(JournalMode):
                 JournalMode.rows = ((JournalMode.dateStartCol + JournalMode.lastDate)//7) + 1
                 JournalMode.dateLocSet = set()
         if (event.x >= mode.width//2-mode.margin and event.x <= mode.width//2+mode.margin) and (event.y >= mode.height-(mode.margin//2) and event.y <= mode.height-(mode.margin//4)):
-            dirName = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}"
-            if not os.path.exists(dirName):
-                pass
-            elif len(os.listdir(dirName)) < 2:
-                pass
-            else:
-                JournalMode.monthlyPlaylist = True
-                mode.app.setActiveMode(mode.app.playlistMode)
+            if os.path.exists(usernamePath):
+                dirName = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}"
+                if not os.path.exists(dirName):
+                    pass
+                elif len(os.listdir(dirName)) < 2:
+                    pass
+                else:
+                    JournalMode.monthlyPlaylist = True
+                    mode.app.setActiveMode(mode.app.playlistMode)
 
     def redrawAll(mode, canvas):
         if JournalMode.monthInt < JournalMode.currMonth:
@@ -356,7 +357,8 @@ class EntryMode(JournalMode):
             exitButton = Button(mode.root, command = mode.end, width = mode.width//2, text = "Exit")
             exitButton.pack()
         if (event.x >= (mode.width//2)+mode.margin and event.x <= mode.width-(2*mode.margin)) and (event.y >= mode.margin and event.y <= (mode.margin + mode.buttonHeight)):
-            mode.app.setActiveMode(mode.app.playlistMode)
+            if os.path.exists(usernamePath):
+                mode.app.setActiveMode(mode.app.playlistMode)
 
     def keyPressed(mode, event):
         if event.key == 'b':
@@ -415,12 +417,16 @@ class PlaylistMode(JournalMode):
     #ask y showMessage isn't working (Exception: 'DailyPlaylistMode' object has no attribute '_root')
     maxSongs = ""
     descrip = ""
+    friendUser = ""
     publicButton = None
     monthJournal = ""
     dayJournal = ""
+    myMusic = None
+    friendMusic = None
+    spotifyMusic = None
 
     def appStarted(mode):
-        mode.margin = mode.height//10
+        mode.margin = mode.height//12
         mode.manila = rgbString(250, 240, 190)
         mode.seafoamGreen = rgbString(160, 214, 181)
         mode.buttonHeight = mode.height//20
@@ -459,63 +465,115 @@ class PlaylistMode(JournalMode):
         canvas.create_text(mode.width//2, mode.margin, text="Playlist Preferences", font=font)
 
     def drawPublicButton(mode, buttonFill, canvas):
-        canvas.create_rectangle(mode.width//2 - mode.buttonHeight - mode.buttonWidth, 2*mode.margin + mode.buttonHeight, (mode.width//2 - mode.buttonHeight), (2*mode.margin + 2*mode.buttonHeight), fill=buttonFill, outline=mode.darkGray)
+        canvas.create_rectangle(mode.width//2 - mode.buttonHeight - mode.buttonWidth, 4*mode.margin + mode.buttonHeight, (mode.width//2 - mode.buttonHeight), (4*mode.margin + 2*mode.buttonHeight), fill=buttonFill, outline=mode.darkGray)
         textCenterX = ((mode.width//2 - mode.buttonHeight)-mode.buttonWidth) + mode.buttonWidth//2
-        canvas.create_text(textCenterX, ((2*mode.margin + mode.buttonHeight) + mode.buttonHeight//2), text="Public", font=f'ComicSansMS {mode.margin//4}')
+        canvas.create_text(textCenterX, ((4*mode.margin + mode.buttonHeight) + mode.buttonHeight//2), text="Public", font=f'ComicSansMS {mode.margin//4}')
 
     def drawPrivateButton(mode, buttonFill, canvas):
-        canvas.create_rectangle(mode.width//2 + mode.buttonHeight, 2*mode.margin + mode.buttonHeight, mode.width//2 + mode.buttonHeight + mode.buttonWidth, (2*mode.margin + 2*mode.buttonHeight), fill=buttonFill, outline=mode.darkGray)
+        canvas.create_rectangle(mode.width//2 + mode.buttonHeight, 4*mode.margin + mode.buttonHeight, mode.width//2 + mode.buttonHeight + mode.buttonWidth, (4*mode.margin + 2*mode.buttonHeight), fill=buttonFill, outline=mode.darkGray)
         textCenterX = ((mode.width//2 + mode.buttonHeight)+mode.buttonWidth) - mode.buttonWidth//2
-        canvas.create_text(textCenterX, ((2*mode.margin + mode.buttonHeight) + mode.buttonHeight//2), text="Private", font=f'ComicSansMS {mode.margin//4}')
+        canvas.create_text(textCenterX, ((4*mode.margin + mode.buttonHeight) + mode.buttonHeight//2), text="Private", font=f'ComicSansMS {mode.margin//4}')
+
+    def myMusicButton(mode, buttonFill, canvas):
+        canvas.create_rectangle(mode.width//5, 2*mode.margin + mode.buttonHeight, mode.width//5 + mode.buttonWidth, (2*mode.margin + 2*mode.buttonHeight), fill=buttonFill, outline=mode.darkGray)
+        canvas.create_text(mode.width//5 + mode.buttonWidth//2, (2*mode.margin + mode.buttonHeight) + mode.buttonHeight//2, text="My music", font=f'ComicSansMS {mode.margin//5}')
+
+    def friendMusicButton(mode, buttonFill, buttonText, canvas):
+        canvas.create_rectangle(mode.width//2 - mode.buttonWidth//2, 2*mode.margin + mode.buttonHeight, mode.width//2 + mode.buttonWidth//2, (2*mode.margin + 2*mode.buttonHeight), fill=buttonFill, outline=mode.darkGray)
+        canvas.create_text(mode.width//2, (2*mode.margin + mode.buttonHeight) + mode.buttonHeight//2, text=buttonText, font=f'ComicSansMS {mode.margin//5}')
+
+    def spotifyMusicButton(mode, buttonFill, canvas):
+        canvas.create_rectangle(mode.width - mode.width//5 - mode.buttonWidth, 2*mode.margin + mode.buttonHeight, mode.width - mode.width//5, (2*mode.margin + 2*mode.buttonHeight), fill=buttonFill, outline=mode.darkGray)
+        canvas.create_text(mode.width - mode.width//5 - mode.buttonWidth//2, (2*mode.margin + mode.buttonHeight) + mode.buttonHeight//2, text="Spotify music", font=f'ComicSansMS {mode.margin//5}')
 
     def redrawAll(mode, canvas):
         mode.drawHeader(canvas)
-        canvas.create_text(mode.width//2, 2*mode.margin, text="Playlist type:", font=f'ComicSansMS {mode.margin//3} bold')
+        canvas.create_text(mode.width//2, 2*mode.margin, text="Songs from: ", font=f'ComicSansMS {mode.margin//3} bold')
+        mode.myMusicButton(mode.manila, canvas)
+        mode.friendMusicButton(mode.manila, "Friend's music", canvas)
+        mode.spotifyMusicButton(mode.manila, canvas)
+        if PlaylistMode.myMusic == True and PlaylistMode.friendMusic == False and PlaylistMode.spotifyMusic == False:
+            mode.myMusicButton(mode.seafoamGreen, canvas)
+        elif PlaylistMode.myMusic == False and PlaylistMode.friendMusic == True and PlaylistMode.spotifyMusic == False:
+            friendUsername = f"Friend user: {PlaylistMode.friendUser}"
+            mode.friendMusicButton(mode.seafoamGreen, friendUsername, canvas)
+        elif PlaylistMode.myMusic == False and PlaylistMode.friendMusic == False and PlaylistMode.spotifyMusic == True:
+            mode.spotifyMusicButton(mode.seafoamGreen, canvas)
+        canvas.create_text(mode.width//2, 4*mode.margin, text="Playlist type:", font=f'ComicSansMS {mode.margin//3} bold')
         mode.drawPublicButton(mode.manila, canvas)
         mode.drawPrivateButton(mode.manila, canvas)
         if PlaylistMode.publicButton == True:
             mode.drawPublicButton(mode.seafoamGreen, canvas)
         elif PlaylistMode.publicButton == False:
             mode.drawPrivateButton(mode.seafoamGreen, canvas)
-        canvas.create_text(mode.width//2, 4*mode.margin, text="Max number of songs in playlist:", font=f'ComicSansMS {mode.margin//3} bold')
-        canvas.create_rectangle(mode.width//3, 4*mode.margin+mode.buttonHeight, (2*mode.width)//3, 4*mode.margin+(2*mode.buttonHeight), fill=mode.manila)
+        canvas.create_text(mode.width//2, 6*mode.margin, text="Max number of songs in playlist (skip if no preference):", font=f'ComicSansMS {mode.margin//3} bold')
+        canvas.create_rectangle(mode.width//3, 6*mode.margin+mode.buttonHeight, (2*mode.width)//3, 6*mode.margin+(2*mode.buttonHeight), fill=mode.manila)
         if (PlaylistMode.maxSongs != None and isinstance(PlaylistMode.maxSongs, str) and PlaylistMode.maxSongs.isdigit()):
             maxSongText = f"Max songs: {PlaylistMode.maxSongs}"
-            canvas.create_text(mode.width//2, (4*mode.margin+mode.buttonHeight)+mode.buttonHeight//2, text=maxSongText, font=f'ComicSansMS {mode.margin//4}')
+            canvas.create_text(mode.width//2, (6*mode.margin+mode.buttonHeight)+mode.buttonHeight//2, text=maxSongText, font=f'ComicSansMS {mode.margin//4}')
         elif (PlaylistMode.maxSongs != None and isinstance(PlaylistMode.maxSongs, int)):
             maxSongText = f"Max songs: {PlaylistMode.maxSongs}"
-            canvas.create_text(mode.width//2, (4*mode.margin+mode.buttonHeight)+mode.buttonHeight//2, text=maxSongText, font=f'ComicSansMS {mode.margin//4}')
+            canvas.create_text(mode.width//2, (6*mode.margin+mode.buttonHeight)+mode.buttonHeight//2, text=maxSongText, font=f'ComicSansMS {mode.margin//4}')
         else:
             maxSongText = "Click here to enter"
-            canvas.create_text(mode.width//2, (4*mode.margin+mode.buttonHeight)+mode.buttonHeight//2, text=maxSongText, font=f'ComicSansMS {mode.margin//4}')
+            canvas.create_text(mode.width//2, (6*mode.margin+mode.buttonHeight)+mode.buttonHeight//2, text=maxSongText, font=f'ComicSansMS {mode.margin//4}')
             PlaylistMode.maxSongs = ""
-        canvas.create_text(mode.width//2, 6*mode.margin, text="Custom description (skip if no preference):", font=f'ComicSansMS {mode.margin//3} bold')
-        canvas.create_rectangle(mode.margin, 6*mode.margin+mode.buttonHeight, mode.width-mode.margin, 6*mode.margin+(3*mode.buttonHeight), fill=mode.manila)
+        canvas.create_text(mode.width//2, 8*mode.margin, text="Custom description (skip if no preference):", font=f'ComicSansMS {mode.margin//3} bold')
+        canvas.create_rectangle(mode.margin, 8*mode.margin+mode.buttonHeight, mode.width-mode.margin, 8*mode.margin+(3*mode.buttonHeight), fill=mode.manila)
         if PlaylistMode.descrip != None and PlaylistMode.descrip != "":
             descripText = PlaylistMode.descrip
-            canvas.create_text(mode.margin+5, (6*mode.margin+mode.buttonHeight)+5, width=mode.width-mode.margin-10, anchor="nw", text=descripText, font=f'Helvetica 15')
+            canvas.create_text(mode.margin+5, (8*mode.margin+mode.buttonHeight)+5, width=mode.width-mode.margin-10, anchor="nw", text=descripText, font=f'Helvetica 15')
         else:
             descripText = "Click here to enter custom description"
-            canvas.create_text(mode.width//2, 6*mode.margin+(2*mode.buttonHeight), text=descripText, font=f'ComicSansMS {mode.margin//4} bold')
-        canvas.create_rectangle(mode.width//3, 8*mode.margin+mode.buttonHeight//2, (2*mode.width)//3, 8*mode.margin+(2*mode.buttonHeight), fill=mode.darkGray)
-        canvas.create_text(mode.width//2, (8*mode.margin+mode.buttonHeight//2)+(2*mode.buttonHeight)//3, text="Create Playlist", fill=mode.seafoamGreen, font=f"ComicSansMS {mode.margin//3} bold")
+            canvas.create_text(mode.width//2, 8*mode.margin+(2*mode.buttonHeight), text=descripText, font=f'ComicSansMS {mode.margin//4} bold')
+        canvas.create_rectangle(mode.width//3, 10*mode.margin+mode.buttonHeight//2, (2*mode.width)//3, 10*mode.margin+(2*mode.buttonHeight), fill=mode.darkGray)
+        canvas.create_text(mode.width//2, (10*mode.margin+mode.buttonHeight//2)+(2*mode.buttonHeight)//3, text="Create Playlist", fill=mode.seafoamGreen, font=f"ComicSansMS {mode.margin//3} bold")
         canvas.create_text(mode.width//2, mode.height - mode.margin//2, text='Click "b" to go back to the calendar screen', font=f'ComicSansMS {mode.margin//4} bold')
 
     def mousePressed(mode, event):
-        if (event.x >= mode.width//2 - mode.buttonHeight - mode.buttonWidth and event.x <= (mode.width//2 - mode.buttonHeight)) and (event.y >= 2*mode.margin + mode.buttonHeight and event.y <= (2*mode.margin + 2*mode.buttonHeight)):
+        if (event.x >= mode.width//5 and event.x <= mode.width//5 + mode.buttonWidth) and (event.y >= 2*mode.margin + mode.buttonHeight and event.y <= (2*mode.margin + 2*mode.buttonHeight)):
+            PlaylistMode.myMusic = True
+            PlaylistMode.friendMusic = False
+            PlaylistMode.spotifyMusic = False
+            print("myMusic")
+        if (event.x >= mode.width//2 - mode.buttonWidth//2 and event.x <= mode.width//2 + mode.buttonWidth//2) and (event.y >= 2*mode.margin + mode.buttonHeight and event.y <= (2*mode.margin + 2*mode.buttonHeight)):
+            PlaylistMode.friendUser = mode.getUserInput("Enter your friend's Spotify username and press 'ok' when done")
+            if PlaylistMode.friendUser == None:
+                PlaylistMode.friendUser = ""
+                PlaylistMode.myMusic = None
+                PlaylistMode.friendMusic = None
+                PlaylistMode.spotifyMusic = None
+            else:
+                PlaylistMode.myMusic = False
+                PlaylistMode.friendMusic = True
+                PlaylistMode.spotifyMusic = False
+            print("friendMusic")
+            print(PlaylistMode.friendUser)
+        if (event.x >= mode.width - mode.width//5 - mode.buttonWidth and event.x <= mode.width - mode.width//5) and (event.y >= 2*mode.margin + mode.buttonHeight and event.y <= (2*mode.margin + 2*mode.buttonHeight)):
+            PlaylistMode.myMusic = False
+            PlaylistMode.friendMusic = False
+            PlaylistMode.spotifyMusic = True
+            print("spotifyMusic")
+        if (event.x >= mode.width//2 - mode.buttonHeight - mode.buttonWidth and event.x <= (mode.width//2 - mode.buttonHeight)) and (event.y >= 4*mode.margin + mode.buttonHeight and event.y <= (4*mode.margin + 2*mode.buttonHeight)):
             PlaylistMode.publicButton = True
-        if (event.x >= mode.width//2 + mode.buttonHeight and event.x <= mode.width//2 + mode.buttonHeight + mode.buttonWidth) and (event.y >= 2*mode.margin + mode.buttonHeight and event.y <= (2*mode.margin + 2*mode.buttonHeight)):
+        if (event.x >= mode.width//2 + mode.buttonHeight and event.x <= mode.width//2 + mode.buttonHeight + mode.buttonWidth) and (event.y >= 4*mode.margin + mode.buttonHeight and event.y <= (4*mode.margin + 2*mode.buttonHeight)):
             PlaylistMode.publicButton = False
-        if (event.x >= mode.width//3 and event.x <= (2*mode.width)//3) and (event.y >= 4*mode.margin+mode.buttonHeight and event.y <= 4*mode.margin+(2*mode.buttonHeight)):
+        if (event.x >= mode.width//3 and event.x <= (2*mode.width)//3) and (event.y >= 6*mode.margin+mode.buttonHeight and event.y <= 6*mode.margin+(2*mode.buttonHeight)):
             PlaylistMode.maxSongs = mode.getUserInput("Enter the max number of songs you want in your playlist (as digits)")
             if PlaylistMode.maxSongs == None:
                 PlaylistMode.maxSongs = ""
-        if (event.x >= mode.margin and event.x <= mode.width-mode.margin) and (event.y >= 6*mode.margin+mode.buttonHeight and event.y <= 6*mode.margin+(3*mode.buttonHeight)):
+        if (event.x >= mode.margin and event.x <= mode.width-mode.margin) and (event.y >= 8*mode.margin+mode.buttonHeight and event.y <= 8*mode.margin+(3*mode.buttonHeight)):
             PlaylistMode.descrip = mode.getUserInput("Enter your custom description for your playlist")
             if PlaylistMode.descrip == None:
                 PlaylistMode.descrip = ""
-        if (event.x >= mode.width//3 and event.x <= (2*mode.width)//3) and (event.y >= (8*mode.margin+mode.buttonHeight//2) and event.y <= 8*mode.margin+(2*mode.buttonHeight)):
-            mode.app.setActiveMode(mode.app.loadingMode)
+        if (event.x >= mode.width//3 and event.x <= (2*mode.width)//3) and (event.y >= (10*mode.margin+mode.buttonHeight//2) and event.y <= 10*mode.margin+(2*mode.buttonHeight)):
+            if PlaylistMode.publicButton == True or PlaylistMode.publicButton == False:
+                if PlaylistMode.myMusic == True and PlaylistMode.friendMusic == False and PlaylistMode.spotifyMusic == False:
+                    mode.app.setActiveMode(mode.app.loadingMode)
+                elif PlaylistMode.myMusic == False and PlaylistMode.friendMusic == True and PlaylistMode.spotifyMusic == False:
+                    mode.app.setActiveMode(mode.app.loadingMode)
+                elif PlaylistMode.myMusic == False and PlaylistMode.friendMusic == False and PlaylistMode.spotifyMusic == True:
+                    mode.app.setActiveMode(mode.app.loadingMode)
 
     def keyPressed(mode, event):
         if event.key == 'b':
@@ -537,12 +595,16 @@ class LoadingMode(PlaylistMode):
         mode.buttonHeight = mode.height//20
         mode.trackIDs = []
         dirName = f"{os.getcwd()}/dogImages"
-        dirList = os.listdir(dirName)
-        dirList.remove('.DS_Store')
-        imageChoice = random.choice(dirList)
+        imageList = []
+        #filter on extension (png or jpg)
+        filters = ['.jpg', '.png']
+        for item in os.listdir(dirName):
+            if any(item.endswith(f) for f in filters):
+                imageList.append(item)
+        imageChoice = random.choice(imageList)
         mode.image1 = mode.loadImage(f"{os.getcwd()}/dogImages/{imageChoice}")
         mode.image2 = mode.scaleImage(mode.image1, 2/3)
-        mode.timerDelay = 100
+        mode.timerDelay = 50
     
     def timerFired(mode):
         if mode.done == False and mode.drawn == True:
@@ -554,7 +616,7 @@ class LoadingMode(PlaylistMode):
                 relevantWords = journalAnalysis.getRelevantWords(PlaylistMode.dayJournal)
             username = readFile(usernamePath)
             userMusic = MusicSetup(username)
-            userMusic.makeSongSet()
+            userMusic.makeUserSongSet()
             songList = userMusic.getTitleMatchedSongs(relevantWords)
             lyricDict = userMusic.getSongLyrics(songList)
             wordCounts = journalAnalysis.countWordOccurrencesInSong(lyricDict)
@@ -607,15 +669,16 @@ class LoadingMode(PlaylistMode):
     def redrawAll(mode, canvas):
         if mode.done == False:
             canvas.create_rectangle(0, 0, mode.width, mode.height, fill=mode.manila)
-            canvas.create_text(mode.width//2, mode.height//4, text="LOADING PLAYLIST...", fill=mode.seafoamGreen, font=f'ComicSansMS {mode.height//20}')
+            canvas.create_text(mode.width//2, mode.height//5, text="LOADING PLAYLIST...", fill=mode.seafoamGreen, font=f'ComicSansMS {mode.height//20}')
+            canvas.create_text(mode.width//2, mode.height//4, text="(this may take a couple of minutes)", fill=mode.seafoamGreen, font=f'ComicSansMS {mode.height//30}')
             canvas.create_image(mode.width//2, mode.height//2, image=ImageTk.PhotoImage(mode.image2))
             mode.drawn = True
         else:
             canvas.create_rectangle(0, 0, mode.width, mode.height, fill=mode.manila)
-            canvas.create_text(mode.width//2, mode.height//3, text="Playlist created! Open up your Spotify app to check it out!", fill=mode.darkGray, font=f'ComicSansMS {mode.height//40}')
+            canvas.create_text(mode.width//2, mode.height//3, text="Playlist created! Open up your Spotify app to check it out!", fill=mode.darkGray, font=f'ComicSansMS {mode.height//35}')
             canvas.create_rectangle(mode.width//3, mode.height//2-(mode.buttonHeight//2), 2*(mode.width//3), mode.height//2+(mode.buttonHeight//2), fill=mode.darkGray)
             canvas.create_text(mode.width//2, mode.height//2, text="Play Songs", font=f'ComicSansMS {mode.buttonHeight//2}', fill=mode.seafoamGreen)
-            canvas.create_text(mode.width//2, mode.height-(mode.height//10), font=f'ComicSansMS {mode.height//40}', text='Click "b" to go back to the calendar screen!')
+            canvas.create_text(mode.width//2, mode.height-(mode.height//10), font=f'ComicSansMS {mode.height//35}', text='Click "b" to go back to the calendar screen!')
 
 class HelpMode(Mode):
     def redrawAll(mode, canvas):

@@ -32,7 +32,7 @@ class MusicSetup(object):
             self.gotAuth = False
 
     #modified from https://spotipy.readthedocs.io/en/2.9.0/#module-spotipy.client
-    def makeSongSet(self):
+    def makeUserSongSet(self):
         for playlist in self.playlists['items']:
             if playlist['owner']['id'] == self.spotifyUsername:
                 results = self.sp.user_playlist(self.spotifyUsername, playlist['id'], fields="tracks,next")
@@ -54,17 +54,24 @@ class MusicSetup(object):
 
     def addTracks(self, tracks):
         for item in tracks['items']:
-            if len(self.songs) > 1000:
+            #print(item)
+            if len(self.songs) >= 1000:
                 break
             track = item['track']
-            if self.isVocalTrack(track['id']):
-                trackList = []
-                trackList.append(track['name'].lower())
-                trackList.append(track['uri'])
-                for i in range(len(track['artists'])):
-                    trackList.append((track['artists'][i]['name']).lower())
-                trackTup = tuple(trackList)
-                self.songs.add(trackTup)
+            if track == None:
+                continue
+            else:
+                if track['id'] == None:
+                    continue
+                else:
+                    if self.isVocalTrack(track['id']):
+                        trackList = []
+                        trackList.append(track['name'].lower())
+                        trackList.append(track['uri'])
+                        for i in range(len(track['artists'])):
+                            trackList.append((track['artists'][i]['name']).lower())
+                        trackTup = tuple(trackList)
+                        self.songs.add(trackTup)
 
     def getLyricsWithGenius(self, title, artist):
         clientToken = "ouarcaeWjKfIm5LhAydon-2Ii_isvB8g_-P2Z6bpyjJw7D5IMdCk9gP92l5aDs0C"
@@ -156,9 +163,24 @@ class MusicSetup(object):
     def isVocalTrack(self, trackID):
         audioAnalysis = self.sp.audio_features(trackID)
         for elem in audioAnalysis:
-            if elem['instrumentalness'] < 0.1:
-                return True
+            if elem == None:
+                continue
+            else:
+                if elem['instrumentalness'] < 0.1:
+                    return True
         return False
+
+    def makeFriendSongSet(self, username):
+        friendPlaylists = self.sp.user_playlists(username)['items']
+        for playlist in friendPlaylists:
+            if playlist['owner']['id'] == username:
+                results = self.sp.user_playlist(username, playlist['id'], fields="tracks,next")
+                tracks = results['tracks']
+                self.addTracks(tracks)
+        if len(self.songs) >= 20:
+            return self.songs
+        else:
+            return None
 
     def createPlaylist(self, trackIDs, month, day=None, publicP=True, descrip=None):
         if day != None:
@@ -191,6 +213,7 @@ class MusicSetup(object):
         songList = []
         for song in self.songs:
             title = song[0]
+            title = self.formatTitle(title)
             for word in relevantWords:
                 if word in title:
                     songList.append(song)

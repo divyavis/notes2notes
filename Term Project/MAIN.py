@@ -8,25 +8,6 @@ import os
 from musicSetup import *
 from journalReading import *
 
-#add reset user button (DONE)
-#make sure create playlist isn't clickable if no entry is in (DONE)
-#logout button (DONE)
-#get out button after playing songs (DONE)
-#loading screen (DONE)
-#collaborative journal --> collaborative playlist
-#add note saying if u want create another playlist run app again
-#see if i can restart app if u want to make a new playlist
-#indicate on calendar screen when someone has made an entry
-#decorate auth website
-#add instructions to help mode
-#mode.showMessage not working??
-#google calendar syncing?
-#public spotify playlists (DONE)
-#nlp
-#query by spotify username (DONE)
-#get public spotify playlists of followers (DONE)
-#other knob direction
-
 #one global variable used is usernamePath to make sure Spotify is authenticated properly everytime app is opened
 usernamePath = f"{os.getcwd()}/spotifyUsername.txt"
 
@@ -63,7 +44,6 @@ def authUser():
 class HomeMode(Mode):
     def appStarted(mode):
         mode.buttonHeight = mode.height//20
-        #mode.path = f"{os.getcwd()}/spotifyUsername.txt"
         #from https://images.unsplash.com/photo-1494232410401-ad00d5433cfa?ixlib=rb-1.2.1&q=80&fm=jpg&crop=entropy&cs=tinysrgb
         mode.image1 = mode.loadImage('cassetteTape.jpeg')
         mode.image2 = mode.scaleImage(mode.image1, 1/3)
@@ -97,7 +77,7 @@ class HomeMode(Mode):
     def keyPressed(mode, event):
         if event.key == 'h':
             mode.app.setActiveMode(mode.app.helpMode)
-    
+
     def mousePressed(mode, event):
         if (event.x >= mode.width//3 and event.x <= (2*mode.width)//3) and (event.y >= (mode.height//2)-(mode.buttonHeight//2) and event.y <= (mode.height//2)+(mode.buttonHeight//2)):
             mode.app.setActiveMode(mode.app.calendarMode)
@@ -106,9 +86,8 @@ class HomeMode(Mode):
                 username = readFile(usernamePath)
                 os.remove(f".cache-{username}")
                 os.remove(usernamePath)
-            else:
-                pass
     
+    #original authorization method tested within graphics (tkinter unsupportive)
     def checkAuth(mode):
         username = mode.getUserInput("Enter your Spotify username")
         if username != None:
@@ -117,7 +96,7 @@ class HomeMode(Mode):
                 mode.writeFile(mode.path, username)
                 return None
             else:
-                mode.showMessage('Authentication failed. Please try again.')
+                mode.app.showMessage('Authentication failed. Please try again.')
                 mode.checkAuth()
 
 class JournalMode(Mode):
@@ -140,6 +119,7 @@ class JournalMode(Mode):
     rows = ((dateStartCol + lastDate)//7) + 1
     dateLocSet = set()
     monthlyPlaylist = False
+    createdPlaylist = False
 
 class CalendarMode(JournalMode):
     def appStarted(mode):
@@ -178,7 +158,7 @@ class CalendarMode(JournalMode):
         y1 = mode.margin + (row+1) * mode.rowHeight
         return (x0, y0, x1, y1)
     
-    #modified from http://www.cs.cmu.edu/~112/notes/notes-animations-part1.html#exampleGrids
+    #first 2 lines modified from http://www.cs.cmu.edu/~112/notes/notes-animations-part1.html#exampleGrids
     def mousePressed(mode, event):
         (row, col) = mode.getCell(event.x, event.y)
         JournalMode.selection = (row, col)
@@ -346,10 +326,6 @@ class EntryMode(JournalMode):
             mode.root.geometry(f"{mode.width}x{mode.height//2}")
             mode.root.title(f"{JournalMode.monthName} {JournalMode.clickedDate}, {JournalMode.currYear}")
             mode.textEntry = Text(mode.root)
-            #sideScrollbar = Scrollbar(textEntry)
-            #sideScrollbar.pack(side=RIGHT)
-            #sideScrollbar.config(command=textEntry.yview)
-            #textEntry.config(yscrollcommand=sideScrollbar.set)
             mode.textEntry.pack()
             loadButton = Button(mode.root, command = mode.load, width = mode.width//2, text = "Load Previous")
             loadButton.pack()
@@ -392,7 +368,7 @@ class EntryMode(JournalMode):
             canvas.create_text(mode.margin+5, (2*mode.margin)+5, text=mode.formatTxt(), anchor= "nw", width=mode.width-((2*mode.margin)+5), font="Helvetica 15")
         canvas.create_text(mode.width//2, (mode.height-(mode.margin//2)), text='Click "b" to go back to calendar screen. Only create a playlist when journal entry is fully complete!', font=f'ComicSansMS {mode.margin//5}')
 
-    #modified from https://stackoverflow.com/questions/14824163/how-to-get-the-input-from-the-tkinter-text-widget
+    #line 394 modified from https://stackoverflow.com/questions/14824163/how-to-get-the-input-from-the-tkinter-text-widget
     def save(mode):
         path = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}/{JournalMode.monthName}{JournalMode.clickedDate}{JournalMode.currYear}.txt"
         textInput = mode.textEntry.get("1.0", "end-1c")
@@ -415,16 +391,16 @@ class EntryMode(JournalMode):
         mode.root.destroy()
 
 class PlaylistMode(JournalMode):
-    #ask y showMessage isn't working (Exception: 'DailyPlaylistMode' object has no attribute '_root')
     maxSongs = ""
     descrip = ""
     friendUser = ""
     publicButton = None
-    monthJournal = ""
+    monthJournal = []
     dayJournal = ""
     myMusic = None
     friendMusic = None
     spotifyMusic = None
+    NLPScoring = False
 
     def appStarted(mode):
         mode.margin = mode.height//12
@@ -433,18 +409,20 @@ class PlaylistMode(JournalMode):
         mode.buttonHeight = mode.height//20
         mode.buttonWidth = mode.width//5
         mode.darkGray = rgbString(40, 40, 40)
+
+    def modeActivated(mode):
         if JournalMode.monthlyPlaylist == True:
             dirName = f"{os.getcwd()}/journalEntries/{JournalMode.monthName}"
             dirList = os.listdir(dirName)
             journalAnalysis = JournalSetup()
             for entry in dirList:
                 smallJournal = journalAnalysis.readSingleEntry(f"{os.getcwd()}/journalEntries/{JournalMode.monthName}/{entry}")
-                if smallJournal == "":
+                if smallJournal == "" or len(smallJournal) <= 10:
                     continue
                 else:
-                    PlaylistMode.monthJournal += '\n' + smallJournal
-            if len(PlaylistMode.monthJournal) <= 20:
-                PlaylistMode.monthJournal == ""
+                    PlaylistMode.monthJournal.append(smallJournal)
+            if len(PlaylistMode.monthJournal) < 2:
+                PlaylistMode.monthJournal == []
                 JournalMode.monthlyPlaylist = False
                 mode.app.setActiveMode(mode.app.calendarMode)
         else:
@@ -462,8 +440,8 @@ class PlaylistMode(JournalMode):
             mode.app.setActiveMode(mode.app.homeMode)
 
     def drawHeader(mode, canvas):
-        font = f'ComicSansMS {mode.margin//2} bold'
-        canvas.create_text(mode.width//2, mode.margin, text="Playlist Preferences", font=font)
+        canvas.create_text(mode.width//2, mode.margin//2, text="Playlist Preferences", font=f'ComicSansMS {mode.margin//3} bold')
+        canvas.create_text(mode.width//2, mode.margin, text='Click "b" to go back to the calendar screen', font=f'ComicSansMS {mode.margin//4}', anchor='n')
 
     def drawPublicButton(mode, buttonFill, canvas):
         canvas.create_rectangle(mode.width//2 - mode.buttonHeight - mode.buttonWidth, 4*mode.margin + mode.buttonHeight, (mode.width//2 - mode.buttonHeight), (4*mode.margin + 2*mode.buttonHeight), fill=buttonFill, outline=mode.darkGray)
@@ -529,7 +507,7 @@ class PlaylistMode(JournalMode):
             canvas.create_text(mode.width//2, 8*mode.margin+(2*mode.buttonHeight), text=descripText, font=f'ComicSansMS {mode.margin//4} bold')
         canvas.create_rectangle(mode.width//3, 10*mode.margin+mode.buttonHeight//2, (2*mode.width)//3, 10*mode.margin+(2*mode.buttonHeight), fill=mode.darkGray)
         canvas.create_text(mode.width//2, (10*mode.margin+mode.buttonHeight//2)+(2*mode.buttonHeight)//3, text="Create Playlist", fill=mode.seafoamGreen, font=f"ComicSansMS {mode.margin//3} bold")
-        canvas.create_text(mode.width//2, mode.height - mode.margin//2, text='Click "b" to go back to the calendar screen', font=f'ComicSansMS {mode.margin//4} bold')
+        canvas.create_text(mode.width//2, mode.height - mode.margin//2, text='Click "n" then click the button above to try TFIDF scoring (better for large datasets)', font=f'ComicSansMS {mode.margin//4}')
 
     def mousePressed(mode, event):
         if (event.x >= mode.width//5 and event.x <= mode.width//5 + mode.buttonWidth) and (event.y >= 2*mode.margin + mode.buttonHeight and event.y <= (2*mode.margin + 2*mode.buttonHeight)):
@@ -573,12 +551,14 @@ class PlaylistMode(JournalMode):
                     mode.app.setActiveMode(mode.app.loadingMode)
 
     def keyPressed(mode, event):
+        if event.key == 'n':
+            PlaylistMode.NLPScoring = True
         if event.key == 'b':
             JournalMode.monthlyPlaylist = False
             PlaylistMode.publicButton = None
             PlaylistMode.maxSongs = ""
             PlaylistMode.descrip = ""
-            PlaylistMode.monthJournal = ""
+            PlaylistMode.monthJournal = []
             PlaylistMode.dayJournal = ""
             mode.app.setActiveMode(mode.app.calendarMode)
 
@@ -601,8 +581,13 @@ class LoadingMode(PlaylistMode):
         imageChoice = random.choice(imageList)
         mode.image1 = mode.loadImage(f"{os.getcwd()}/dogImages/{imageChoice}")
         mode.image2 = mode.scaleImage(mode.image1, 2/3)
-        mode.timerDelay = 50
+        mode.timerDelay = 50     
     
+    def modeActivated(mode):
+        mode.done = False
+        mode.drawn = False
+        mode.userWorks = True
+
     def timerFired(mode):
         if mode.done == False and mode.drawn == True:
             if JournalMode.monthlyPlaylist == True:
@@ -616,48 +601,57 @@ class LoadingMode(PlaylistMode):
             if PlaylistMode.myMusic == True:
                 userMusic.makeUserSongSet()
             elif PlaylistMode.friendMusic == True:
-                userMusic.makeFriendSongSet(PlaylistMode.friendUser)
+                try:
+                    userMusic.makeFriendSongSet(PlaylistMode.friendUser)
+                except:
+                    mode.userWorks = False
+                    mode.app.showMessage("Username doesn't exist")
+                    mode.app.setActiveMode(mode.app.calendarMode)
             elif PlaylistMode.spotifyMusic == True:
                 userMusic.makeFriendSongSet("spotify")
-            songList = userMusic.getTitleMatchedSongs(relevantWords)
-            lyricDict = userMusic.getSongLyrics(songList)
-            wordCounts = journalAnalysis.countWordOccurrencesInSong(lyricDict)
-            songScores = journalAnalysis.scoreSongs()
-            rankedSongs = journalAnalysis.rankSongs(songScores)
-            if (isinstance(PlaylistMode.maxSongs, str) and PlaylistMode.maxSongs != "" and PlaylistMode.maxSongs.isdigit()):
-                PlaylistMode.maxSongs = int(PlaylistMode.maxSongs)
-                rankedSongs = journalAnalysis.eliminateNonMatches(rankedSongs, maxSongs=PlaylistMode.maxSongs)
-            elif (isinstance(PlaylistMode.maxSongs, int)):
-                rankedSongs = journalAnalysis.eliminateNonMatches(rankedSongs, maxSongs=PlaylistMode.maxSongs)
-            else:
-                rankedSongs = journalAnalysis.eliminateNonMatches(rankedSongs)
-            mode.trackIDs = userMusic.getPlaylistTrackIDs(rankedSongs)
-            if PlaylistMode.descrip != "":
-                if PlaylistMode.publicButton == True or PlaylistMode.publicButton == False:
-                    if JournalMode.monthlyPlaylist == False:
-                        userMusic.createPlaylist(mode.trackIDs, JournalMode.monthName, day=JournalMode.clickedDate, publicP= PlaylistMode.publicButton, descrip=PlaylistMode.descrip)
-                    else:
-                        userMusic.createPlaylist(mode.trackIDs, JournalMode.monthName, publicP= PlaylistMode.publicButton, descrip=PlaylistMode.descrip)
-                JournalMode.monthlyPlaylist = False
-            else:
-                keywords = journalAnalysis.getKeywordsUsed()
-                keywords = (", ").join(keywords)
-                if PlaylistMode.publicButton == True or PlaylistMode.publicButton == False:
-                    if JournalMode.monthlyPlaylist == False:
-                        userMusic.createPlaylist(mode.trackIDs, JournalMode.monthName, day=JournalMode.clickedDate, publicP= PlaylistMode.publicButton, descrip=f"keywords: {keywords}")
-                    else:
-                        userMusic.createPlaylist(mode.trackIDs, JournalMode.monthName, publicP= PlaylistMode.publicButton, descrip=f"keywords: {keywords}")
-                JournalMode.monthlyPlaylist = False
-            mode.done = True
-            PlaylistMode.maxSongs = ""
-            PlaylistMode.descrip = ""
-            PlaylistMode.publicButton = None
-            PlaylistMode.monthJournal = ""
-            PlaylistMode.dayJournal = ""
-            PlaylistMode.friendUser = ""
-            PlaylistMode.myMusic = None
-            PlaylistMode.friendMusic = None
-            PlaylistMode.spotifyMusic = None
+            if mode.userWorks:
+                songList = userMusic.getTitleMatchedSongs(relevantWords)
+                lyricDict = userMusic.getSongLyrics(songList)
+                wordCounts = journalAnalysis.countWordOccurrencesInSong(lyricDict)
+                if PlaylistMode.NLPScoring == True:
+                    songScores = journalAnalysis.scoreSongsNLP()
+                else:
+                    songScores = journalAnalysis.scoreSongs()
+                rankedSongs = journalAnalysis.rankSongs(songScores)
+                if (isinstance(PlaylistMode.maxSongs, str) and PlaylistMode.maxSongs != "" and PlaylistMode.maxSongs.isdigit()):
+                    PlaylistMode.maxSongs = int(PlaylistMode.maxSongs)
+                    rankedSongs = journalAnalysis.eliminateNonMatches(rankedSongs, maxSongs=PlaylistMode.maxSongs)
+                elif (isinstance(PlaylistMode.maxSongs, int)):
+                    rankedSongs = journalAnalysis.eliminateNonMatches(rankedSongs, maxSongs=PlaylistMode.maxSongs)
+                else:
+                    rankedSongs = journalAnalysis.eliminateNonMatches(rankedSongs)
+                mode.trackIDs = userMusic.getPlaylistTrackIDs(rankedSongs)
+                if PlaylistMode.descrip != "":
+                    if PlaylistMode.publicButton == True or PlaylistMode.publicButton == False:
+                        if JournalMode.monthlyPlaylist == False:
+                            userMusic.createPlaylist(mode.trackIDs, JournalMode.monthName, day=JournalMode.clickedDate, publicP=PlaylistMode.publicButton, descrip=PlaylistMode.descrip)
+                        else:
+                            userMusic.createPlaylist(mode.trackIDs, JournalMode.monthName, publicP= PlaylistMode.publicButton, descrip=PlaylistMode.descrip)
+                    JournalMode.monthlyPlaylist = False
+                else:
+                    keywords = journalAnalysis.keywords
+                    keywords = (", ").join(keywords)
+                    if PlaylistMode.publicButton == True or PlaylistMode.publicButton == False:
+                        if JournalMode.monthlyPlaylist == False:
+                            userMusic.createPlaylist(mode.trackIDs, JournalMode.monthName, day=JournalMode.clickedDate, publicP=PlaylistMode.publicButton, descrip=f"top keywords: {keywords}")
+                        else:
+                            userMusic.createPlaylist(mode.trackIDs, JournalMode.monthName, publicP= PlaylistMode.publicButton, descrip=f"top keywords: {keywords}")
+                    JournalMode.monthlyPlaylist = False
+                mode.done = True
+                PlaylistMode.maxSongs = ""
+                PlaylistMode.descrip = ""
+                PlaylistMode.publicButton = None
+                PlaylistMode.monthJournal = []
+                PlaylistMode.dayJournal = ""
+                PlaylistMode.friendUser = ""
+                PlaylistMode.myMusic = None
+                PlaylistMode.friendMusic = None
+                PlaylistMode.spotifyMusic = None
     
     def keyPressed(mode, event):
         if event.key == 'b':
@@ -667,16 +661,19 @@ class LoadingMode(PlaylistMode):
             mode.app.setActiveMode(mode.app.calendarMode)
 
     def mousePressed(mode, event):
-        if (event.x >= mode.width//3 and event.x <= 2*(mode.width//3)) and (event.y >= mode.height//2-(mode.buttonHeight//2) and event.y <= mode.height//2+(mode.buttonHeight//2)):
-            username = readFile(usernamePath)
-            userMusic = MusicSetup(username)
-            userMusic.playSongs(mode.trackIDs)
+        if mode.done == True:
+            if (event.x >= mode.width//3 and event.x <= 2*(mode.width//3)) and (event.y >= mode.height//2-(mode.buttonHeight//2) and event.y <= mode.height//2+(mode.buttonHeight//2)):
+                username = readFile(usernamePath)
+                userMusic = MusicSetup(username)
+                userMusic.playSongs(mode.trackIDs)
+                if userMusic.playSongs(mode.trackIDs) == None:
+                    mode.app.showMessage("Cannot find device. Unable to play songs.")
 
     def redrawAll(mode, canvas):
         if mode.done == False:
             canvas.create_rectangle(0, 0, mode.width, mode.height, fill=mode.manila)
             canvas.create_text(mode.width//2, mode.height//5, text="LOADING PLAYLIST...", fill=mode.seafoamGreen, font=f'ComicSansMS {mode.height//20}')
-            canvas.create_text(mode.width//2, mode.height//4, text="(this may take a couple of minutes)", fill=mode.seafoamGreen, font=f'ComicSansMS {mode.height//30}')
+            canvas.create_text(mode.width//2, mode.height//4, text="(this may take a few minutes)", fill=mode.seafoamGreen, font=f'ComicSansMS {mode.height//30}')
             canvas.create_image(mode.width//2, mode.height//2, image=ImageTk.PhotoImage(mode.image2))
             mode.drawn = True
         else:
@@ -687,10 +684,19 @@ class LoadingMode(PlaylistMode):
             canvas.create_text(mode.width//2, mode.height-(mode.height//10), font=f'ComicSansMS {mode.height//35}', text='Click "b" to go back to the calendar screen!')
 
 class HelpMode(Mode):
+    def appStarted(mode):
+        mode.margin = mode.height//10
+        mode.seafoamGreen = rgbString(160, 214, 181)
+        mode.manila = rgbString(250, 240, 190)
+        mode.darkGray = rgbString(40, 40, 40)
+
     def redrawAll(mode, canvas):
-        font = 'ComicSansMS 26 bold'
-        canvas.create_text(mode.width/2, 250, text='(Insert helpful message here)', font=font)
-        canvas.create_text(mode.width/2, 350, text='Click "b" to go back to the home screen!', font=font)
+        canvas.create_rectangle(0, 0, mode.width, mode.height, fill=mode.manila)
+        canvas.create_text(mode.width//2, mode.margin, text="Instructions", font=f"ComicSansMS {mode.margin//2} bold")
+        canvas.create_text(mode.width//2, 2*mode.margin, text='1. On the home screen, click "see your journal" to begin writing journal entries. You can logout of your Spotify at any time and reauthenticate on the home screen as well.', width=mode.width-mode.margin, font=f"ComicSansMS {mode.margin//4}")
+        canvas.create_text(mode.width//2, 4*mode.margin, text='2. On the calendar screen, click any date to take you to the entry screen. Once you have a collection of journal entries for many days of the same month, you can also create a monthly playlist!', width=mode.width-mode.margin, font=f"ComicSansMS {mode.margin//4}")
+        canvas.create_text(mode.width//2, 6*mode.margin, text='3. 0n the entry screen, you can make a new entry or edit an unfinished entry. The larger the entry, the better the results! Once done, click "Create Playlist" to make a playlist off of the entry', width=mode.width-mode.margin, font=f"ComicSansMS {mode.margin//4}")
+        canvas.create_text(mode.width//2, 8*mode.margin, text='4. 0n the playlist preferences screen, you can specify what preferences you have for the playlist you want to create. Then click "Create Playlist" and sit tight! The playlist will take a few minutes to load.', width=mode.width-mode.margin, font=f"ComicSansMS {mode.margin//4}")
 
     def keyPressed(mode, event):
         if event.key == 'b':

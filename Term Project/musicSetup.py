@@ -1,3 +1,5 @@
+import module_manager
+module_manager.review()
 import os
 import spotipy
 import spotipy.util as util
@@ -10,8 +12,6 @@ class MusicSetup(object):
         self.spotifyUsername = username
         self.getSpotifyAuth()
         self.songs = set()
-        self.publicPlaylist = True
-        self.flash = False
 
     #modified from https://spotipy.readthedocs.io/en/2.9.0/#module-spotipy.client
     def getSpotifyAuth(self):
@@ -54,7 +54,7 @@ class MusicSetup(object):
 
     def addTracks(self, tracks):
         for item in tracks['items']:
-            #print(item)
+            #self.songs capped at 1000 so that dataset doesn't get too big (takes time to generate)
             if len(self.songs) >= 1000:
                 break
             track = item['track']
@@ -97,9 +97,9 @@ class MusicSetup(object):
                 updatedWord += "-"
         return updatedWord
 
-    #modified from https://www.promptcloud.com/blog/scraping-song-lyrics-using-python-from-genius/
     def getLyricsV2(self, song):
         title = song[0]
+        #song = (title, url, artist) if len(song) is over 3 there are multiple artists in song
         if len(song) > 3:
             if ' (feat. ' in title or ' [feat. ' in title or ' feat. ' in title or len(song) > 5:
                 title = self.formatTitle(title)
@@ -110,6 +110,7 @@ class MusicSetup(object):
                 page = requests.get(URL)
                 if page.status_code == 404:
                     return None
+            #2 artists
             elif len(song) == 4:
                 title = self.formatTitle(title)
                 title = self.formatLink(title)
@@ -124,6 +125,7 @@ class MusicSetup(object):
                     page = requests.get(URL)
                     if page.status_code == 404:
                         return None
+            #3 artists
             elif len(song) == 5:
                 title = self.formatTitle(title)
                 title = self.formatLink(title)
@@ -142,6 +144,7 @@ class MusicSetup(object):
                         return None
             else:
                 return None
+        #only 1 artist
         else:
             title = self.formatTitle(title)
             title = self.formatLink(title)
@@ -151,6 +154,7 @@ class MusicSetup(object):
             page = requests.get(URL)
             if page.status_code == 404:
                 return None
+        #modified from https://www.promptcloud.com/blog/scraping-song-lyrics-using-python-from-genius/
         soup = BeautifulSoup(page.content, 'html.parser')
         for div in soup.findAll('div', attrs = {'class': 'lyrics'}):
             lyricList = div.text.strip().split("\n")
@@ -166,10 +170,12 @@ class MusicSetup(object):
             if elem == None:
                 continue
             else:
+                #songs with high instrumentalness values are likely non-vocal tracks (after some research 0.1 seemed to be a good threshold)
                 if elem['instrumentalness'] < 0.1:
                     return True
         return False
 
+    #modified from https://spotipy.readthedocs.io/en/2.9.0/#module-spotipy.client
     def makeFriendSongSet(self, username):
         friendPlaylists = self.sp.user_playlists(username)['items']
         for playlist in friendPlaylists:
@@ -177,10 +183,7 @@ class MusicSetup(object):
                 results = self.sp.user_playlist(username, playlist['id'], fields="tracks,next")
                 tracks = results['tracks']
                 self.addTracks(tracks)
-        if len(self.songs) >= 20:
-            return self.songs
-        else:
-            return None
+        return self.songs
 
     def createPlaylist(self, trackIDs, month, day=None, publicP=True, descrip=None):
         if day != None:
@@ -198,6 +201,7 @@ class MusicSetup(object):
     def getDeviceID(self):
         deviceInfo = self.sp.devices()['devices']
         for elem in deviceInfo:
+            #plays from computer that app is running from
             if elem['type'] == 'Computer':
                 return elem['id']
         return None
@@ -206,8 +210,9 @@ class MusicSetup(object):
         deviceID = self.getDeviceID()
         if deviceID != None:
             self.sp.start_playback(device_id=deviceID, uris=trackIDs)
+            return True
         else:
-            return "cannot find your spotify device (must be desktop app)"
+            return None
 
     def getTitleMatchedSongs(self, relevantWords):
         songList = []
@@ -225,6 +230,7 @@ class MusicSetup(object):
         for song in songList:
             lyrics = self.getLyricsV2(song)
             if lyrics != None:
+                #song[1] is url
                 lyricDict[(song[0], song[1])] = lyrics
         return lyricDict
 
